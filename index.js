@@ -3,6 +3,8 @@ import { Client as ElasticClient } from "@elastic/elasticsearch";
 import cors from "cors";
 import dotenv from "dotenv";
 import { OpenAI } from "openai";
+import { CharacterTextSplitter } from "langchain/text_splitter";
+import { OpenAIEmbeddings } from "@langchain/openai";
 
 dotenv.config();
 
@@ -16,6 +18,13 @@ const es = new ElasticClient({
         username: process.env.ELASTIC_USER,
         password: process.env.ELASTIC_PASSWORD
     }
+});
+
+const indexName = "document_embeddings";
+
+const model = new OpenAIEmbeddings({
+    openAIApiKey: process.env.OPENAI_API_KEY,
+    modelName: "text-embedding-3-small",
 });
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -66,7 +75,9 @@ async function generateAnswer(question, idCollection) {
 
     const messages = [
         { "role": "system", "content": "Você é um assistente jurídico." },
-        { "role": "user", "content": `Você precisa responder à pergunta com base no contexto abaixo:\n\nCONTEXTO:\n${context}\n\nPERGUNTA: ${question}\n\nResponda com base no contexto e seja claro e preciso.` }
+        { "role": "user", "content": `Você precisa responder à pergunta com base no 
+            contexto abaixo:\n\nCONTEXTO:\n${context}\n\nPERGUNTA: ${question}\n\nResponda com base no 
+            contexto e seja claro e preciso, fazendo referencia ao texto quando necessário.` }
     ];
 
     const response = await openai.chat.completions.create({
@@ -132,6 +143,90 @@ app.post("/chat", async (req, res) => {
         console.error("Erro ao gerar resposta:", error);
         res.status(500).json({ error: "Erro interno no servidor" });
     }
+});
+
+//gravar documento
+
+const chunkSize = 500; // Tamanho do chunk
+const overlapSize = Math.floor(chunkSize * 0.2); // Sobreposição de 20%
+
+const splitter = new CharacterTextSplitter({
+    separator: ".",  // Define o separador como ponto final
+    chunkSize: chunkSize,
+    chunkOverlap: overlapSize,
+    lengthFunction: (str) => str.length, // Função para medir o tamanho do chunk
+    isSeparatorRegex: false, // Define que o separador não é uma regex
+});
+
+async function getDocument(id){
+    try {
+        const response = await es.get({
+            index: 'documents',
+            id
+        });
+        return response._source;
+    } catch (error) {
+        console.log('erro ao buscar documento', error);
+    }
+}
+
+async function indexChunks(allSplits, docId, title) {
+    console.log(docId, title);
+    for (let i = 0; i < allSplits.length; i++) {
+      const chunk = allSplits[i];
+      const text = chunk.pageContent;
+      
+      console.log(`Chunk ${i + 1}: ${text}`);
+  
+      const embedding = await model.embedQuery(text);
+  
+      const doc = {
+        text,
+        title,
+        id: docId,
+        embedding, 
+      };
+  
+      await es.index({
+        index: indexName,
+        body: doc,
+      });
+    }
+  
+    console.log(`${allSplits.length} chunks foram indexados com sucesso no Elasticsearch!`);
+}
+
+async function saveEmbbeddingsDocument(id){
+    const resp = await getDocument(id)
+
+    const full_text = resp.pages.map(page => page.text_page).join(' ')
+    
+    const metadatas = [{
+        id,
+        'nome do arquivo': resp.title
+    }]
+
+    const allSplits = await splitter.createDocuments([full_text], metadatas);
+
+    console.log(allSplits.map(chunk => ({
+        text: chunk.pageContent,
+        metadata: chunk.metadata
+    })));
+
+    indexChunks(allSplits, id, resp.title);
+}
+
+app.post('/save-embeddings', async (req, res) => {
+    try {
+        const { id } = req.body;
+        if (!id) return res.status(400).json({ error: "ID não fornecido." });
+        await saveEmbbeddingsDocument(id);
+        res.send('Embedding salvo com sucesso!');
+    } catch (error) {
+        console.error("Erro:", error);
+        res.status(500).json({ error: "Erro interno ao processar o documento." });
+    }
+ 
 });
 
 const PORT = process.env.PORT || 3000;
