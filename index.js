@@ -83,7 +83,7 @@ async function generateAnswer(question, idCollection) {
     const response = await openai.chat.completions.create({
         model: "gpt-4",
         messages: messages,
-        max_tokens: 150,
+        max_tokens: 200,
         temperature: 0.7
     });
 
@@ -221,6 +221,59 @@ app.post('/save-embeddings', async (req, res) => {
         const { id } = req.body;
         if (!id) return res.status(400).json({ error: "ID não fornecido." });
         await saveEmbbeddingsDocument(id);
+        res.send('Embedding salvo com sucesso!');
+    } catch (error) {
+        console.error("Erro:", error);
+        res.status(500).json({ error: "Erro interno ao processar o documento." });
+    }
+ 
+});
+
+async function getPagesCollection(ids){
+    try {
+        const response = await es.search({
+            index: 'pages_v2',
+            body: {
+                query: {
+                    terms: {
+                        "page_to_norma.parent": ids // Lista de IDs
+                    }
+                }
+            }
+        });
+        const documents = response.hits.hits.map(hit => hit._source);
+        return documents;
+    } catch (error) {
+        console.log("error");
+    }
+}
+
+async function saveEmbbeddingsCollection(ids, title, id){
+    const resp = await getPagesCollection(ids)
+
+    const full_text = resp.map(page => page.text_page).join(' ')
+
+    const metadatas = [{
+        id,
+        'nome do arquivo': title
+    }]
+
+    const allSplits = await splitter.createDocuments([full_text], metadatas);
+
+    console.log(allSplits.map(chunk => ({
+        text: chunk.pageContent,
+        metadata: chunk.metadata
+    })));
+
+    indexChunks(allSplits, id, title);
+}
+
+app.post('/save-collection-embeddings', async (req, res) => {
+    try {
+        const { ids, title, id } = req.body;
+        if (!ids.length) return res.status(400).json({ error: "ID não fornecido." });
+
+        await saveEmbbeddingsCollection(ids, title, id);
         res.send('Embedding salvo com sucesso!');
     } catch (error) {
         console.error("Erro:", error);
