@@ -312,5 +312,35 @@ app.post('/resumir', async (req, res) => {
     }
 });
 
+app.post('/palavras-chave', async (req, res) => {
+    const { texto } = req.body;
+  
+    if (!texto) {
+      return res.status(400).json({ error: 'Texto é obrigatório.' });
+    }
+  
+    try {
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-3.5-turbo',
+        messages: [
+          {
+            role: 'system',
+            content: 'Você é um assistente que extrai palavras-chave importantes de textos.',
+          },
+          {
+            role: 'user',
+            content: `Extraia as principais palavras-chave do seguinte texto, separadas por vírgula:\n\n${texto}`,
+          },
+        ],
+      });
+  
+      const palavrasChave = completion.choices[0].message.content;
+      res.json({ palavrasChave });
+    } catch (error) {
+      console.error('Erro ao chamar a API da OpenAI:', error);
+      res.status(500).json({ error: 'Erro ao extrair palavras-chave.' });
+    }
+  });
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
