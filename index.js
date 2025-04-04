@@ -282,5 +282,35 @@ app.post('/save-collection-embeddings', async (req, res) => {
  
 });
 
+app.post('/resumir', async (req, res) => {
+    const { texto } = req.body;
+  
+    if (!texto) {
+      return res.status(400).json({ error: 'Texto é obrigatório.' });
+    }
+  
+    try {
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-3.5-turbo', // ou gpt-4 se tiver acesso
+        messages: [
+          {
+            role: 'system',
+            content: 'Você é um assistente que resume textos de forma clara e objetiva.',
+          },
+          {
+            role: 'user',
+            content: `Resuma o seguinte texto:\n\n${texto}`,
+          },
+        ],
+      });
+  
+      const resumo = completion.choices[0].message.content;
+      res.json({ resumo });
+    } catch (error) {
+      console.error('Erro ao chamar a API da OpenAI:', error);
+      res.status(500).json({ error: 'Erro ao gerar resumo.' });
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
