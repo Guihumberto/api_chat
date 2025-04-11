@@ -48,11 +48,9 @@ async function searchRelevantChunks(question, idCollection, top_k = 5) {
         "size": top_k,
         "query": {
             "script_score": {
-                "query": { 
-                    "match": {
-                        "id": idCollection
-                    }
-                },
+                query: idCollection
+                    ? { match: { id: idCollection } } 
+                    : { match_all: {} },              
                 "script": {
                     "source": "cosineSimilarity(params.query_vector, 'embedding') + 1.0",
                     "params": { "query_vector": query_embedding }
@@ -69,7 +67,7 @@ async function searchRelevantChunks(question, idCollection, top_k = 5) {
     return response.hits.hits.map(hit => hit._source.text);
 }
 
-async function generateAnswer(question, idCollection) {
+async function generateAnswer(question, idCollection = null) {
     const retrieved_chunks = await searchRelevantChunks(question, idCollection);
     const context = retrieved_chunks.join("\n");
 
@@ -95,7 +93,11 @@ app.post("/ask", async (req, res) => {
         const { question, idCollection } = req.body;
 
         if (!question) return res.status(400).json({ error: "Pergunta não fornecida." });
-        if (!idCollection) return res.status(400).json({ error: "idCollection não fornecido." });
+
+        if (!idCollection) {
+            const answer = await generateAnswer(question);
+            res.json({ answer });
+        }
 
         const answer = await generateAnswer(question, idCollection);
         res.json({ answer });
@@ -147,7 +149,7 @@ app.post("/chat", async (req, res) => {
 
 //gravar documento
 
-const chunkSize = 500; // Tamanho do chunk
+const chunkSize = 900; // Tamanho do chunk
 const overlapSize = Math.floor(chunkSize * 0.2); // Sobreposição de 20%
 
 const splitter = new CharacterTextSplitter({
@@ -233,6 +235,7 @@ async function getPagesCollection(ids){
     try {
         const response = await es.search({
             index: 'pages_v2',
+            size: 10000,
             body: {
                 query: {
                     terms: {
