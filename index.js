@@ -96,14 +96,14 @@ app.post("/ask", async (req, res) => {
 
         if (!idCollection) {
             const answer = await generateAnswer(question);
-            res.json({ answer });
+            return res.json({ answer });
         }
 
         const answer = await generateAnswer(question, idCollection);
-        res.json({ answer });
+        return res.json({ answer });
     } catch (error) {
         console.error("Erro:", error);
-        res.status(500).json({ error: "Erro interno ao processar a pergunta." });
+        return res.status(500).json({ error: "Erro interno ao processar a pergunta." });
     }
 });
 
@@ -277,7 +277,7 @@ app.post('/save-collection-embeddings', async (req, res) => {
         if (!ids.length) return res.status(400).json({ error: "ID não fornecido." });
 
         await saveEmbbeddingsCollection(ids, title, id);
-        res.send('Embedding salvo com sucesso!');
+        return res.send('Embedding salvo com sucesso!');
     } catch (error) {
         console.error("Erro:", error);
         res.status(500).json({ error: "Erro interno ao processar o documento." });
@@ -286,7 +286,7 @@ app.post('/save-collection-embeddings', async (req, res) => {
 });
 
 app.post('/resumir', async (req, res) => {
-    const { texto } = req.body;
+    const { texto, orientacao = null } = req.body;
   
     if (!texto) {
       return res.status(400).json({ error: 'Texto é obrigatório.' });
@@ -298,7 +298,7 @@ app.post('/resumir', async (req, res) => {
         messages: [
           {
             role: 'system',
-            content: 'Você é um assistente que resume textos de forma clara e objetiva.',
+            content: orientacao || 'Você é um assistente que resume textos de forma clara e objetiva.',
           },
           {
             role: 'user',
@@ -308,7 +308,7 @@ app.post('/resumir', async (req, res) => {
       });
   
       const resumo = completion.choices[0].message.content;
-      res.json({ resumo });
+      return res.json({ resumo });
     } catch (error) {
       console.error('Erro ao chamar a API da OpenAI:', error);
       res.status(500).json({ error: 'Erro ao gerar resumo.' });
@@ -328,17 +328,17 @@ app.post('/palavras-chave', async (req, res) => {
         messages: [
           {
             role: 'system',
-            content: 'Você é um assistente que extrai palavras-chave importantes de textos.',
+            content: 'Você é um assistente que extrai as palavras-chave importantes de textos.',
           },
           {
             role: 'user',
-            content: `Extraia as principais palavras-chave do seguinte texto, separadas por vírgula:\n\n${texto}`,
+            content: `Extraia as 5 principais palavras-chave do seguinte texto, separadas por vírgula:\n\n${texto}`,
           },
         ],
       });
   
       const palavrasChave = completion.choices[0].message.content;
-      res.json({ palavrasChave });
+      return res.json({ palavrasChave });
     } catch (error) {
       console.error('Erro ao chamar a API da OpenAI:', error);
       res.status(500).json({ error: 'Erro ao extrair palavras-chave.' });
