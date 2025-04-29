@@ -173,7 +173,6 @@ async function getDocument(id){
 }
 
 async function indexChunks(allSplits, docId, title) {
-    console.log(docId, title);
     for (let i = 0; i < allSplits.length; i++) {
       const chunk = allSplits[i];
       const text = chunk.pageContent;
@@ -263,11 +262,6 @@ async function saveEmbbeddingsCollection(ids, title, id){
 
     const allSplits = await splitter.createDocuments([full_text], metadatas);
 
-    console.log(allSplits.map(chunk => ({
-        text: chunk.pageContent,
-        metadata: chunk.metadata
-    })));
-
     indexChunks(allSplits, id, title);
 }
 
@@ -343,7 +337,121 @@ app.post('/palavras-chave', async (req, res) => {
       console.error('Erro ao chamar a API da OpenAI:', error);
       res.status(500).json({ error: 'Erro ao extrair palavras-chave.' });
     }
-  });
+});
+
+async function filterArtsLawQuestoes(id_group, id_art) {
+    const search_body = {
+        "size": 50,
+        "query": {
+            bool: {
+                must: [
+                    { term: { art: id_art } },
+                    { term: { idGroup: id_group } }
+                ]
+            }
+        }
+    };
+
+    const response = await es.search({
+        index: 'law_forum',
+        body: search_body
+    });
+
+    return response.hits.hits.map(hit => hit._source.textlaw);
+}
+
+async function indexQuestoesElastic(allSplits, id_law, id_art) {
+    for (let i = 0; i < allSplits.length; i++) {
+      const questao = allSplits[i];
+  
+      const doc = {
+        ...questao,
+        id_law,
+        id_art,
+        tipo: 'c/e',
+        date_created: Date.now(),
+        created_by: 'admin',
+      };
+
+      console.log('doc', doc);
+  
+      await es.index({
+        index: 'questoes',
+        body: doc,
+      });
+    }
+  
+    console.log(`${allSplits.length} questões foram indexados com sucesso no Elasticsearch!`);
+}
+
+async function generateQuestoes(id_group, id_art, prompt) {
+    const filterArt = await filterArtsLawQuestoes(id_group, id_art);
+    const context = filterArt.join("\n");
+
+    console.log('api context', context);
+
+    const messages = [
+        {
+            role: "system",
+            content: "Você é um assistente jurídico que gera questões de concurso com base em um texto."
+        },
+        {
+            role: "user",
+            content: `Gere 5 questões do tipo certo/errado no estilo CESPE/CEBRASPE com base no CONTEXTO abaixo.
+            
+            CONTEXTO:
+            ${context}
+            
+            Instruções:
+            - Retorne a resposta **exclusivamente** como um **array JSON válido**.
+            - Cada objeto do array deve ter a seguinte estrutura:
+            {
+            "pergunta": "texto da pergunta",
+            "resposta": "verdadeiro ou falso",
+            "justificativa": "justificativa com base no contexto"
+            }
+            - Não adicione nenhum texto antes ou depois do array, nem numeração ou rótulos. Apenas o array puro.
+            `
+        }
+    ];
+
+    const response = await openai.chat.completions.create({
+        model: "gpt-4",
+        messages: messages,
+        max_tokens: 500,
+        temperature: 0.7
+    });
+
+    const resp = response.choices[0].message.content;
+
+    const questoes = JSON.parse(resp);
+
+    console.log('questoes', questoes);
+
+    await indexQuestoesElastic(questoes, id_group, id_art);
+
+    return
+}
+
+app.post('/gerar_questoes', async(req, res) => {
+    const { id_group, id_art, prompt } = req.body;
+
+    console.log('api gerar questoes');
+
+    if (!id_group && !id_art && !prompt) {
+        return res.status(400).json({ error: 'Ids e prompts são obrigatórios.' });
+    }
+
+    try {
+        await generateQuestoes(id_group, id_art, prompt);
+        return res.send('Questões salvas com sucesso!');
+    } catch (error) {
+        console.error('Erro ao chamar a API da OpenAI:', error);
+        res.status(500).json({ error: 'Erro ao gerar questoes.' });
+    }
+
+})
+
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
