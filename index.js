@@ -361,6 +361,8 @@ async function filterArtsLawQuestoes(id_group, id_art) {
 }
 
 async function indexQuestoesElastic(allSplits, id_law, id_art) {
+    let dataAtual = new Date();
+    let ano = dataAtual.getFullYear();
     for (let i = 0; i < allSplits.length; i++) {
       const questao = allSplits[i];
   
@@ -371,9 +373,10 @@ async function indexQuestoesElastic(allSplits, id_law, id_art) {
         tipo: 'c/e',
         date_created: Date.now(),
         created_by: 'admin',
+        banca: "GERADA POR IA",
+        concurso: "GERADA POR IA",
+        ano
       };
-
-      console.log('doc', doc);
   
       await es.index({
         index: 'questoes',
@@ -425,8 +428,6 @@ async function generateQuestoes(id_group, id_art, prompt) {
     const resp = response.choices[0].message.content;
 
     const questoes = JSON.parse(resp);
-
-    console.log('questoes', questoes);
 
     await indexQuestoesElastic(questoes, id_group, id_art);
 
