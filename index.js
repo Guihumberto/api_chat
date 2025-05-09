@@ -373,9 +373,9 @@ async function indexQuestoesElastic(allSplits, id_law, id_art) {
         tipo: 'c/e',
         date_created: Date.now(),
         created_by: 'admin',
-        banca: "GERADA POR IA",
-        concurso: "GERADA POR IA",
-        ano
+        banca: 'GERADA POR IA',
+        concurso: 'GERADA POR IA',
+        ano: ano
       };
   
       await es.index({
@@ -387,9 +387,9 @@ async function indexQuestoesElastic(allSplits, id_law, id_art) {
     console.log(`${allSplits.length} questões foram indexados com sucesso no Elasticsearch!`);
 }
 
-async function generateQuestoes(id_group, id_art, prompt) {
+async function generateQuestoes(id_group, id_art) {
     const filterArt = await filterArtsLawQuestoes(id_group, id_art);
-    const context = filterArt.join("\n");
+    const context = filterArt.filter(Boolean).join("\n");
 
     console.log('api context', context);
 
@@ -414,6 +414,7 @@ async function generateQuestoes(id_group, id_art, prompt) {
             "justificativa": "justificativa com base no contexto"
             }
             - Não adicione nenhum texto antes ou depois do array, nem numeração ou rótulos. Apenas o array puro.
+            - Sua resposta **deve começar com \`[\` e terminar com \`]\`** e conter apenas JSON válido.
             `
         }
     ];
@@ -421,13 +422,34 @@ async function generateQuestoes(id_group, id_art, prompt) {
     const response = await openai.chat.completions.create({
         model: "gpt-4",
         messages: messages,
-        max_tokens: 500,
+        max_tokens: 1500,
         temperature: 0.7
     });
 
+
+
+
     const resp = response.choices[0].message.content;
 
-    const questoes = JSON.parse(resp);
+    console.log("Resposta bruta do modelo:", resp);
+
+    if (!resp.trim().startsWith('[') || !resp.trim().endsWith(']')) {
+        throw new Error("Nenhum array JSON encontrado na resposta.");
+    }
+
+    let questoes;
+    try {
+        const arrayMatch = resp.match(/\[\s*{[\s\S]*?}\s*\]/); // pega o primeiro array JSON
+        if (!arrayMatch) {
+            throw new Error('Nenhum array JSON encontrado na resposta.');
+        }
+
+        questoes = JSON.parse(arrayMatch[0]);
+    } catch (err) {
+        console.error("Erro ao fazer parse do JSON da resposta da OpenAI:", err);
+        console.error("Resposta recebida:", resp);
+        throw err;
+    }
 
     await indexQuestoesElastic(questoes, id_group, id_art);
 
@@ -435,16 +457,14 @@ async function generateQuestoes(id_group, id_art, prompt) {
 }
 
 app.post('/gerar_questoes', async(req, res) => {
-    const { id_group, id_art, prompt } = req.body;
+    const { id_group, id_art } = req.body;
 
-    console.log('api gerar questoes');
-
-    if (!id_group && !id_art && !prompt) {
+    if (!id_group && !id_art) {
         return res.status(400).json({ error: 'Ids e prompts são obrigatórios.' });
     }
 
     try {
-        await generateQuestoes(id_group, id_art, prompt);
+        await generateQuestoes(id_group, id_art);
         return res.send('Questões salvas com sucesso!');
     } catch (error) {
         console.error('Erro ao chamar a API da OpenAI:', error);
