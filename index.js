@@ -413,6 +413,7 @@ async function generateQuestoes(id_group, id_art) {
             "resposta": "verdadeiro ou falso",
             "justificativa": "justificativa com base no contexto"
             }
+            - Não crie perguntas que mencione o dispositivo/artigo.
             - Não adicione nenhum texto antes ou depois do array, nem numeração ou rótulos. Apenas o array puro.
             - Sua resposta **deve começar com \`[\` e terminar com \`]\`** e conter apenas JSON válido.
             `
