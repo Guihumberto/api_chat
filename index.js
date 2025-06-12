@@ -391,8 +391,6 @@ async function generateQuestoes(id_group, id_art) {
     const filterArt = await filterArtsLawQuestoes(id_group, id_art);
     const context = filterArt.filter(Boolean).join("\n");
 
-    console.log('api context', context);
-
     const messages = [
         {
             role: "system",
@@ -426,9 +424,6 @@ async function generateQuestoes(id_group, id_art) {
         max_tokens: 1500,
         temperature: 0.7
     });
-
-
-
 
     const resp = response.choices[0].message.content;
 
@@ -474,6 +469,134 @@ app.post('/gerar_questoes', async(req, res) => {
 
 })
 
+app.post('/generate_mapmind', async (req, res) => {
+  const { texto } = req.body;
+
+  if (!texto) {
+    return res.status(400).json({ error: 'Texto é obrigatório.' });
+  }
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4', // ou 'gpt-4o'
+      messages: [
+        {
+          role: 'system',
+          content: `Você é um assistente jurídico especializado em transformar textos legais em mapas mentais estruturados.`,
+        },
+        {
+          role: 'user',
+          content: `
+            A partir do texto a seguir, gere um mapa mental exclusivamente no formato JSON, conforme este modelo:
+
+            {
+                title: 'Título Principal',
+                subtitle: 'Referência (Art. X)',
+                type: 'root',
+                level: 0,
+                expanded: true,
+                metadata: {
+                    source: 'Lei Complementar X',
+                    lastUpdate: '2024-01-01'
+                },
+            children: [
+                {
+                id: 'concept-1',
+                title: 'Conceito Principal',
+                description: 'Descrição do conceito...',
+                type: 'concept',
+                level: 1,
+                expanded: false,
+                children: [
+                    {
+                    id: 'definition-1',
+                    title: 'Definição Específica',
+                    subtitle: '§ 1º',
+                    description: 'Explicação detalhada...',
+                    type: 'definition',
+                    level: 2,
+                    expanded: false,
+                    children: [
+                        {
+                        id: 'item-1',
+                        title: 'Item Específico',
+                        description: 'Detalhe do item...',
+                        type: 'item',
+                        level: 3,
+                        icon: 'mdi-check-circle',
+                        color: 'green'
+                        }
+                    ]
+                    }
+                ]
+                },
+                {
+                id: 'exclusions',
+                title: 'Exclusões',
+                type: 'exclusion',
+                level: 1,
+                expanded: false,
+                children: [
+                    {
+                    id: 'exclusion-1',
+                    title: 'Primeira Exclusão',
+                    description: 'Descrição da exclusão...',
+                    type: 'item',
+                    level: 2,
+                    icon: 'mdi-minus-circle'
+                    }
+                ]
+                }
+            ]
+            }
+
+            Regras:
+            - Gere um único JSON completo e bem formatado.
+            - Não inclua nenhuma explicação fora do JSON.
+            - Se necessário, divida o conteúdo internamente mas una tudo em um JSON final.
+            - Respeite os níveis hierárquicos e use os tipos conforme o modelo: 'root', 'concept', 'definition', 'item', 'exclusion'.
+            - Todos os campos exigidos devem ser preenchidos.
+
+            Texto:
+            ${texto}
+        `,
+        },
+      ],
+      temperature: 0.3,
+      stream: false,
+    });
+
+    let content = response.choices[0].message.content;
+
+    // Tenta limpar conteúdo solto antes/depois do JSON
+    const firstBrace = content.indexOf('{');
+    const lastBrace = content.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1) {
+      content = content.substring(firstBrace, lastBrace + 1);
+    }
+
+    try {
+      const parsed = JSON.parse(content);
+      return res.json({ mapamental: parsed });
+    } catch (err) {
+      // Tenta transformar em JSON com eval como fallback seguro (último recurso)
+      try {
+        const fixed = content
+          .replace(/(['"])?([a-zA-Z0-9_]+)(['"])?:/g, '"$2":') // Garante aspas nas chaves
+          .replace(/'/g, '"'); // Troca aspas simples por duplas
+
+        const parsedFixed = JSON.parse(fixed);
+        return res.json({ mapamental: parsedFixed });
+      } catch (innerErr) {
+        console.warn('Falha ao transformar em JSON. Retornando conteúdo bruto.');
+        return res.json({ mapamental: content });
+      }
+    }
+  } catch (error) {
+    console.error('Erro ao chamar a API da OpenAI:', error);
+    res.status(500).json({ error: 'Erro ao gerar mapa mental.' });
+  }
+});
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
