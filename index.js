@@ -12,6 +12,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+//importar rotas
+import concusoRoutes from './routes/concurso.js'
+
 const es = new ElasticClient({
     cloud: { id: process.env.ELASTIC_CLOUD_ID },
     auth: {
@@ -32,6 +35,10 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 app.get("/", (req, res) => {
     res.send("Uhu, O servidor está rodando! 🚀\nComo posso te ajudar com a legislação hoje?");
 });
+
+// Rotas
+app.use('/concursos', concusoRoutes({ openai, es }));
+
 
 async function generateEmbedding(text) {
     const response = await openai.embeddings.create({
