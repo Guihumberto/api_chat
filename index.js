@@ -14,6 +14,7 @@ app.use(express.json());
 
 //importar rotas
 import concusoRoutes from './routes/concurso.js'
+import forumRoutes from './routes/forum.js'
 
 const es = new ElasticClient({
     cloud: { id: process.env.ELASTIC_CLOUD_ID },
@@ -38,6 +39,7 @@ app.get("/", (req, res) => {
 
 // Rotas
 app.use('/concursos', concusoRoutes({ openai, es }));
+app.use('/forum', forumRoutes({ openai, es }));
 
 
 async function generateEmbedding(text) {
