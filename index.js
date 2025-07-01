@@ -6,11 +6,33 @@ import { OpenAI } from "openai";
 import { CharacterTextSplitter } from "langchain/text_splitter";
 import { OpenAIEmbeddings } from "@langchain/openai";
 
+const app = express();
 dotenv.config();
 
-const app = express();
-app.use(cors());
+const allowedOrigins = [
+  "https://leges.estudodalei.com.br",
+  "https://legislacao.estudodalei.com.br",
+  "http://localhost:3000",
+];
+
+
 app.use(express.json());
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Permitir requisições sem origin (como mobile apps ou curl/postman)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    } else {
+      return callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: false, // se você estiver usando cookies ou headers de autenticação
+};
+
+app.use(cors(corsOptions));
 
 //importar rotas
 import concusoRoutes from './routes/concurso.js'
