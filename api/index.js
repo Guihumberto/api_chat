@@ -124,6 +124,4 @@ app.post('/search', async (req, res) => {
 });
 
 // Handler para Vercel - IMPORTANTE!
-export default (req, res) => {
-  return app(req, res);
-};
+export default app;
