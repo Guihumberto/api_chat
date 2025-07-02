@@ -35,8 +35,8 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 //importar rotas
-import concusoRoutes from './routes/concurso.js'
-import forumRoutes from './routes/forum.js'
+import concusoRoutes from '../routes/concurso.js'
+import forumRoutes from '../routes/forum.js'
 
 const es = new ElasticClient({
     cloud: { id: process.env.ELASTIC_CLOUD_ID },
@@ -629,8 +629,8 @@ app.post('/generate_mapmind', async (req, res) => {
   }
 });
 
-// Para Vercel, exporte o app
-export default app;
-
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+
+// Para Vercel, exporte o app
+export default app;
