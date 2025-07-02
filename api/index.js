@@ -21,6 +21,7 @@ app.use(express.json());
 const corsOptions = {
   origin: function (origin, callback) {
     // Permitir requisições sem origin (como mobile apps ou curl/postman)
+    console.log("CORS origin:", origin);
     if (!origin) return callback(null, true);
 
     if (allowedOrigins.includes(origin)) {
@@ -33,6 +34,7 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 //importar rotas
 import concusoRoutes from '../routes/concurso.js'
