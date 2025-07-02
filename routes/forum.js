@@ -378,5 +378,16 @@ export default function createForumRouter({ openai, es }) {
         });
     });
 
+    // router.post('/analise-juridica', async (req, res) => {
+    //   const sistema = new SistemaMultiagenteJuridico(process.env.ANTHROPIC_API_KEY);
+      
+    //   try {
+    //     const resultado = await sistema.gerarAnaliseJuridica(req.body);
+    //     res.json(resultado);
+    //   } catch (error) {
+    //     res.status(500).json({ erro: error.message });
+    //   }
+    // });
+
   return router;
 }

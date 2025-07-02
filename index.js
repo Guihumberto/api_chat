@@ -629,5 +629,8 @@ app.post('/generate_mapmind', async (req, res) => {
   }
 });
 
+// Para Vercel, exporte o app
+module.exports = app;
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
