@@ -393,7 +393,7 @@ async function filterArtsLawQuestoes(id_group, id_art) {
     return response.hits.hits.map(hit => hit._source.textlaw);
 }
 
-async function indexQuestoesElastic(allSplits, id_law, id_art) {
+async function indexQuestoesElastic(allSplits, id_law, id_art, id_origin_law) {
     let dataAtual = new Date();
     let ano = dataAtual.getFullYear();
     for (let i = 0; i < allSplits.length; i++) {
@@ -401,6 +401,7 @@ async function indexQuestoesElastic(allSplits, id_law, id_art) {
   
       const doc = {
         ...questao,
+        id_origin_law,
         id_law,
         id_art,
         tipo: 'c/e',
@@ -420,7 +421,7 @@ async function indexQuestoesElastic(allSplits, id_law, id_art) {
     console.log(`${allSplits.length} questões foram indexados com sucesso no Elasticsearch!`);
 }
 
-async function generateQuestoes(id_group, id_art) {
+async function generateQuestoes(id_group, id_art, id_origin_law) {
     const filterArt = await filterArtsLawQuestoes(id_group, id_art);
     const context = filterArt.filter(Boolean).join("\n");
 
@@ -480,20 +481,20 @@ async function generateQuestoes(id_group, id_art) {
         throw err;
     }
 
-    await indexQuestoesElastic(questoes, id_group, id_art);
+    await indexQuestoesElastic(questoes, id_group, id_art, id_origin_law);
 
     return
 }
 
 app.post('/gerar_questoes', async(req, res) => {
-    const { id_group, id_art } = req.body;
+    const { id_group, id_art, id_origin_law } = req.body;
 
-    if (!id_group && !id_art) {
+    if (!id_group && !id_art && !id_origin_law) {
         return res.status(400).json({ error: 'Ids e prompts são obrigatórios.' });
     }
 
     try {
-        await generateQuestoes(id_group, id_art);
+        await generateQuestoes(id_group, id_art, id_origin_law);
         return res.send('Questões salvas com sucesso!');
     } catch (error) {
         console.error('Erro ao chamar a API da OpenAI:', error);
