@@ -259,17 +259,17 @@ export default function createForumRouter({ openai, es }) {
 
             // Validação do input
             if (!texto || typeof texto !== 'string' || texto.trim().length === 0) {
-            return res.status(400).json({
-                error: 'Texto inválido',
-                message: 'O campo "texto" é obrigatório e deve conter o texto legal a ser analisado'
-            });
+              return res.status(400).json({
+                  error: 'Texto inválido',
+                  message: 'O campo "texto" é obrigatório e deve conter o texto legal a ser analisado'
+              });
             }
 
             if (texto.length > 50000) {
-            return res.status(400).json({
-                error: 'Texto muito longo',
-                message: 'O texto deve ter no máximo 50.000 caracteres'
-            });
+              return res.status(400).json({
+                  error: 'Texto muito longo',
+                  message: 'O texto deve ter no máximo 50.000 caracteres'
+              });
             }
 
             const prompt = BASE_PROMPT.replace('[TEXTO_PLACEHOLDER]', texto.trim());
@@ -376,6 +376,100 @@ export default function createForumRouter({ openai, es }) {
             'ANTHROPIC_API_KEY': 'Chave da API Anthropic (obrigatória)'
             }
         });
+    });
+
+    // Rota para explicar dispositivo
+    router.post('/explicar_dispositivo', validateApiKey, async (req, res) => {
+      const { artigo, texto, num_art, law } = req.body;
+    
+      if (!texto && !artigo && !num_art && !law) {
+        return res.status(400).json({ error: 'Campos obrigatórios.' });
+      }
+
+      if (texto.length > 50000) {
+        return res.status(400).json({
+            error: 'Texto muito longo',
+            message: 'O texto deve ter no máximo 50.000 caracteres'
+        });
+      }
+
+      const prompt = `Você é um especialista em Legislação com ampla experiência em concursos públicos e ensino jurídico. Analise o texto legal fornecido e execute as seguintes tarefas:
+        TEXTO A ANALISAR: ${texto}
+
+        TAREFAS A EXECUTAR:
+        1. Explique detalhadamente o texto analisado que se refere ao aritgo ${num_art} da norma ${law}. O artigo na integra consta assim ${artigo}.
+        2. Explique de forma estruturada.
+        3. Informe a relação dele com outros dispositivos dentro da propria norma (${law}) e com outras normas.)
+        4. Explique a relação dele com a jurisprudência do STF o STJ.
+        
+        DIRETRIZES ESPECÍFICAS:
+
+        **Para o texto explicativo:**
+        * Use linguagem acessível mas tecnicamente precisa
+        * Destaque implicações práticas e aplicações reais
+        * Mencione possíveis pegadinhas ou pontos de confusão
+        * Estruture em parágrafos bem organizados
+        * Tamanho: 300-500 palavras
+        * Formate com marcadores HTML necessárioamente, incluvise com cores, negrito e italico, sublinhado quando quiser detacar algo
+
+        * Use linguagem que desperte interesse do leitor
+
+        **Critérios de Qualidade:**
+        * Precisão técnica absoluta
+        * Didática clara e objetiva
+        * Relevância prática para concursos
+        * Formatação em HTML adequada para melhor leitura com espaçamento adequado entre as linhas.
+        * Coerência entre todos os elementos gerados
+
+        Execute todas as tarefas com excelência técnica e didática.
+      `;
+    
+      try {
+        // // Faz a chamada para a API da Anthropic
+        console.log('Fazendo chamada para API Anthropic...');
+        const anthropicResponse = await callAnthropicAPI(prompt);
+
+        // // Extrai o conteúdo da resposta
+        const content = anthropicResponse.content[0]?.text;
+        if (!content) {
+            throw new Error('Resposta vazia da API Anthropic');
+        }
+
+        console.log('content:', content);
+
+        // Retorna a análise estruturada
+        res.json({
+            success: true,
+            data: content,
+            metadata: {
+                timestamp: new Date().toISOString(),
+                textLength: texto.length,
+                model: 'claude-3-5-sonnet-20241022',
+            }
+        });
+          
+      } catch (error) {
+            console.error('Erro na análise do texto legal:', error);
+            
+            if (error.response?.status === 401) {
+            return res.status(401).json({
+                error: 'Erro de autenticação',
+                message: 'Chave da API Anthropic inválida'
+            });
+            }
+
+            if (error.response?.status === 429) {
+            return res.status(429).json({
+                error: 'Limite de requisições excedido',
+                message: 'Muitas requisições. Tente novamente em alguns minutos.'
+            });
+            }
+
+            res.status(500).json({
+            error: 'Erro interno do servidor',
+            message: error.message || 'Erro desconhecido na análise do texto'
+            });
+      }
     });
 
     // router.post('/analise-juridica', async (req, res) => {

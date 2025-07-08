@@ -325,11 +325,13 @@ app.post('/resumir', async (req, res) => {
         messages: [
           {
             role: 'system',
-            content: orientacao || 'Você é um assistente que resume textos de forma clara e objetiva.',
+            content: orientacao || 'Você é um assistente que resume textos de forma clara e objetiva.  IMPORTANTE: não use blocos de código nem /`/`/`//html na resposta. Apenas retorne o HTML diretamente como texto.',
           },
           {
             role: 'user',
-            content: `Resuma o seguinte texto:\n\n${texto}`,
+            content: `Resuma e retorne o texto formatado em html para dar destaques relevantes no seguinte texto:\n\n${texto}
+                
+            `,
           },
         ],
       });
