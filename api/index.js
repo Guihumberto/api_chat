@@ -372,13 +372,13 @@ app.post('/palavras-chave', async (req, res) => {
     }
 });
 
-async function filterArtsLawQuestoes(id_group, id_art) {
+async function filterArtsLawQuestoes(id_group, list_arts) {
     const search_body = {
         "size": 50,
         "query": {
             bool: {
                 must: [
-                    { term: { art: id_art } },
+                    { terms: { art: list_arts } },
                     { term: { idGroup: id_group } }
                 ]
             }
@@ -393,7 +393,7 @@ async function filterArtsLawQuestoes(id_group, id_art) {
     return response.hits.hits.map(hit => hit._source.textlaw);
 }
 
-async function indexQuestoesElastic(allSplits, id_law, id_art, id_origin_law) {
+async function indexQuestoesElastic(allSplits, id_law, id_art, list_arts, id_origin_law) {
     let dataAtual = new Date();
     let ano = dataAtual.getFullYear();
     for (let i = 0; i < allSplits.length; i++) {
@@ -404,6 +404,7 @@ async function indexQuestoesElastic(allSplits, id_law, id_art, id_origin_law) {
         id_origin_law,
         id_law,
         id_art,
+        list_arts,
         tipo: 'c/e',
         date_created: Date.now(),
         created_by: 'admin',
@@ -421,8 +422,8 @@ async function indexQuestoesElastic(allSplits, id_law, id_art, id_origin_law) {
     console.log(`${allSplits.length} questões foram indexados com sucesso no Elasticsearch!`);
 }
 
-async function generateQuestoes(id_group, id_art, id_origin_law) {
-    const filterArt = await filterArtsLawQuestoes(id_group, id_art);
+async function generateQuestoes(id_group, id_art, list_arts, id_origin_law) {
+    const filterArt = await filterArtsLawQuestoes(id_group, list_arts);
     const context = filterArt.filter(Boolean).join("\n");
 
     const messages = [
@@ -445,7 +446,7 @@ async function generateQuestoes(id_group, id_art, id_origin_law) {
             "resposta": "verdadeiro ou falso",
             "justificativa": "justificativa com base no contexto"
             }
-            - Não crie perguntas que mencione o dispositivo/artigo.
+            - Não crie perguntas que pergunte ou mencione qual é o dispositivo/artigo.
             - Não adicione nenhum texto antes ou depois do array, nem numeração ou rótulos. Apenas o array puro.
             - Sua resposta **deve começar com \`[\` e terminar com \`]\`** e conter apenas JSON válido.
             `
@@ -481,20 +482,20 @@ async function generateQuestoes(id_group, id_art, id_origin_law) {
         throw err;
     }
 
-    await indexQuestoesElastic(questoes, id_group, id_art, id_origin_law);
+    await indexQuestoesElastic(questoes, id_group, id_art, list_arts, id_origin_law);
 
     return
 }
 
 app.post('/gerar_questoes', async(req, res) => {
-    const { id_group, id_art, id_origin_law } = req.body;
+    const { id_group, id_art, id_origin_law, list_arts } = req.body;
 
     if (!id_group && !id_art && !id_origin_law) {
         return res.status(400).json({ error: 'Ids e prompts são obrigatórios.' });
     }
 
     try {
-        await generateQuestoes(id_group, id_art, id_origin_law);
+        await generateQuestoes(id_group, id_art, list_arts, id_origin_law);
         return res.send('Questões salvas com sucesso!');
     } catch (error) {
         console.error('Erro ao chamar a API da OpenAI:', error);
