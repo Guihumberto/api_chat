@@ -321,7 +321,7 @@ app.post('/resumir', async (req, res) => {
   
     try {
       const completion = await openai.chat.completions.create({
-        model: 'gpt-3.5-turbo', // ou gpt-4 se tiver acesso
+        model: 'gpt-4', // ou gpt-4 se tiver acesso
         messages: [
           {
             role: 'system',
@@ -329,8 +329,12 @@ app.post('/resumir', async (req, res) => {
           },
           {
             role: 'user',
-            content: `Resuma e retorne o texto formatado em html para dar destaques relevantes no seguinte texto:\n\n${texto}
-                
+            content: `
+                Resuma e retorne o texto formatado em html para dar destaques relevantes no seguinte texto:\n\n${texto}
+                Faça relações relevantes de como esse trecho é cobrado em questoes de concurso publico, principalmente da cespe.
+                Faça relações com a jurisprudencia do STF e do STJ caso ja tenham sido objeto de prova de concursos públicos e do exame da oab.
+                Resuma de forma organizada e estruturada, explicando algum termo que precise ser conceituado.
+                Faça marcações no texto em negrito, italico ou sublindado, use cores para destacar.
             `,
           },
         ],
@@ -353,7 +357,7 @@ app.post('/palavras-chave', async (req, res) => {
   
     try {
       const completion = await openai.chat.completions.create({
-        model: 'gpt-3.5-turbo',
+        model: 'gpt-4',
         messages: [
           {
             role: 'system',
