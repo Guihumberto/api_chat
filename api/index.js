@@ -365,7 +365,7 @@ app.post('/palavras-chave', async (req, res) => {
           },
           {
             role: 'user',
-            content: `Extraia as 5 principais palavras-chave do seguinte texto, separadas por vírgula:\n\n${texto}`,
+            content: `Extraia até 5 principais palavras-chave do seguinte texto, separadas por vírgula:\n\n${texto}`,
           },
         ],
       });
@@ -454,6 +454,7 @@ async function generateQuestoes(id_group, id_art, list_arts, id_origin_law) {
             }
             - Não crie perguntas que pergunte ou mencione qual é o dispositivo/artigo.
             - Não adicione nenhum texto antes ou depois do array, nem numeração ou rótulos. Apenas o array puro.
+            - busque questões reais de certo e errado de concursos dos ultimos 5 anos da cespe ou outra banca adaptando para certo e errado
             - Sua resposta **deve começar com \`[\` e terminar com \`]\`** e conter apenas JSON válido.
             `
         }
@@ -638,6 +639,36 @@ app.post('/generate_mapmind', async (req, res) => {
     res.status(500).json({ error: 'Erro ao gerar mapa mental.' });
   }
 });
+
+app.post('/sendMsgWhats', async (req, res) => {
+  const { phone, msg } = req.body;
+  console.log('phone', phone, 'msg', msg);
+  try {
+    const response = await fetch('https://redbot.redoctopus.com.br/send', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        key: process.env.REDBOT_API_KEY,
+        destinatario: phone,
+        mensagem: msg
+      })
+    })
+
+    console.log('response', response);
+
+    res.json(response);
+  } catch (error) {
+    res.status(500).json({ error: error.toString() });
+  }
+});
+
+app.listen(4000, () => {
+  console.log('Proxy rodando em http://localhost:4000');
+});
+
+
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
