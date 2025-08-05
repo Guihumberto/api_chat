@@ -667,11 +667,6 @@ app.post('/sendMsgWhats', async (req, res) => {
   }
 });
 
-app.listen(4000, () => {
-  console.log('Proxy rodando em http://localhost:4000');
-});
-
-
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));

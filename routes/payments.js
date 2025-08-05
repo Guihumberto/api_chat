@@ -27,46 +27,53 @@ export default function createForumRouter({ openai, es }) {
         try {
             const { amount, email, description = process.env.PRODUCT_NAME } = req.body;
 
-            const preferenceData = {
-                items: [{
-                    title: description,
-                    unit_price: parseFloat(amount),
-                    quantity: 1,
-                    currency_id: 'BRL'
-                }],
+            const paymentData = {
+                transaction_amount: parseFloat(amount),
+                description: description,
+                payment_method_id: 'pix',
                 payer: {
-                    email: email
+                    email: email,
+                    // Dados opcionais do pagador
+                    first_name: 'Cliente',
+                    last_name: 'Teste'
                 },
-                payment_methods: {
-                    excluded_payment_methods: [],
-                    excluded_payment_types: [],
-                    installments: 1,
-                    default_payment_method_id: null,
-                    default_installments: null
-                },
-                back_urls: {
-                    success: `${process.env.FRONTEND_URL}/payment/success`,
-                    failure: `${process.env.FRONTEND_URL}/payment/failure`,
-                    pending: `${process.env.FRONTEND_URL}/payment/pending`
-                },
-                auto_return: 'approved',
                 external_reference: `pix_${Date.now()}`,
-                expires: true,
-                expiration_date_from: new Date().toISOString(),
-                expiration_date_to: new Date(Date.now() + 30 * 60 * 1000).toISOString() // 30 min
+                notification_url: `${process.env.BACKEND_URL || 'https://api-chat-neon.vercel.app'}/mercadopagowh/mercadopago`,
+                // Data de expiração do PIX (30 minutos)
+                date_of_expiration: new Date(Date.now() + 30 * 60 * 1000).toISOString()
             };
 
-            const result = await preference.create({ body: preferenceData });
+            console.log('Criando pagamento PIX:', paymentData);
+
+            const result = await payment.create({ body: paymentData });
             
-            res.json({
+            console.log('PIX criado:', {
                 id: result.id,
-                init_point: result.init_point,
-                sandbox_init_point: result.sandbox_init_point,
-                external_reference: result.external_reference
+                status: result.status,
+                qr_code: result.point_of_interaction?.transaction_data?.qr_code ? 'Presente' : 'Ausente'
             });
+
+            // Extrair dados do PIX
+            const pixData = {
+                id: result.id,
+                status: result.status,
+                external_reference: result.external_reference,
+                amount: result.transaction_amount,
+                currency: result.currency_id,
+                qr_code: result.point_of_interaction?.transaction_data?.qr_code || null,
+                qr_code_base64: result.point_of_interaction?.transaction_data?.qr_code_base64 || null,
+                ticket_url: result.point_of_interaction?.transaction_data?.ticket_url || null,
+                expiration_date: result.date_of_expiration
+            };
+
+            res.json(pixData);
         } catch (error) {
-            console.error('Erro ao criar PIX:', error);
-            res.status(500).json({ error: 'Erro interno do servidor', details: error.message });
+                console.error('Erro ao criar PIX:', error);
+                console.error('Detalhes do erro:', error.response?.data || error.message);
+                res.status(500).json({ 
+                error: 'Erro interno do servidor', 
+                details: error.response?.data || error.message 
+            });
         }
     });
 
@@ -171,12 +178,15 @@ export default function createForumRouter({ openai, es }) {
             const paymentInfo = await payment.get({ id: paymentId });
             
             res.json({
-            status: paymentInfo.status,
-            status_detail: paymentInfo.status_detail,
-            amount: paymentInfo.transaction_amount,
-            currency: paymentInfo.currency_id,
-            payment_method: paymentInfo.payment_method_id,
-            external_reference: paymentInfo.external_reference
+                id: paymentInfo.id,
+                status: paymentInfo.status,
+                status_detail: paymentInfo.status_detail,
+                amount: paymentInfo.transaction_amount,
+                currency: paymentInfo.currency_id,
+                payment_method: paymentInfo.payment_method_id,
+                external_reference: paymentInfo.external_reference,
+                date_created: paymentInfo.date_created,
+                date_approved: paymentInfo.date_approved
             });
         } catch (error) {
             console.error('Erro ao consultar pagamento:', error);
