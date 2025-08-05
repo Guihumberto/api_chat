@@ -27,6 +27,8 @@ export default function createForumRouter({ openai, es }) {
         try {
             const { amount, email, description = process.env.PRODUCT_NAME } = req.body;
 
+            console.log('Valor recebido no body:', amount);
+
             const paymentData = {
                 transaction_amount: parseFloat(amount),
                 description: description,
@@ -46,6 +48,7 @@ export default function createForumRouter({ openai, es }) {
             console.log('Criando pagamento PIX:', paymentData);
 
             const result = await payment.create({ body: paymentData });
+            console.log("Resposta completa:", result);
             
             console.log('PIX criado:', {
                 id: result.id,
@@ -65,6 +68,9 @@ export default function createForumRouter({ openai, es }) {
                 ticket_url: result.point_of_interaction?.transaction_data?.ticket_url || null,
                 expiration_date: result.date_of_expiration
             };
+
+            const paymentInfo = await payment.get({ id: 121111899914 });
+            console.log('Pagamento encontrado:', paymentInfo);
 
             res.json(pixData);
         } catch (error) {
