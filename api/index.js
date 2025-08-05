@@ -39,6 +39,9 @@ app.options('*', cors(corsOptions));
 //importar rotas
 import concusoRoutes from '../routes/concurso.js'
 import forumRoutes from '../routes/forum.js'
+import paymentRoutes  from '../routes/payments.js'
+import webhookRoutes  from '../routes/webhooks.js'
+
 
 const es = new ElasticClient({
     cloud: { id: process.env.ELASTIC_CLOUD_ID },
@@ -64,6 +67,8 @@ app.get("/", (req, res) => {
 // Rotas
 app.use('/concursos', concusoRoutes({ openai, es }));
 app.use('/forum', forumRoutes({ openai, es }));
+app.use('/paymentml', paymentRoutes({ openai, es }));
+app.use('/mercadopagowh', webhookRoutes({ openai, es }));
 
 
 async function generateEmbedding(text) {
@@ -655,8 +660,6 @@ app.post('/sendMsgWhats', async (req, res) => {
         mensagem: msg
       })
     })
-
-    console.log('response', response);
 
     res.json(response);
   } catch (error) {
