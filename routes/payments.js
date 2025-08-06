@@ -361,11 +361,18 @@ export default function createForumRouter({ openai, es }) {
             console.log('pixData', pixData);
             console.log('userId', userId);
 
-            if(pixData.status === 'approved') await setAssinaturas(pixData, userId, es)
+            if(pixData.status === 'approved') {
+                await setAssinaturas(pixData, userId, es)
+                res.json({
+                   status: "ok"
+                })
+                return
+            } 
 
             res.json({
-               status: "ok"
-            })
+                   status: "pending"
+                })
+
             
         } catch (error) {
             console.log('error change assintura');
