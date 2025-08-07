@@ -14,6 +14,7 @@ const allowedOrigins = [
   "https://legislacao.estudodalei.com.br",
   "https://www.leges.estudodalei.com.br",
   "http://localhost:3000",
+  "https://www.amapa.estudodalei.com.br"
 ];
 
 
