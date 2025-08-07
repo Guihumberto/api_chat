@@ -12,6 +12,7 @@ dotenv.config();
 const allowedOrigins = [
   "https://leges.estudodalei.com.br",
   "https://legislacao.estudodalei.com.br",
+  "https://www.leges.estudodalei.com.br",
   "http://localhost:3000",
 ];
 

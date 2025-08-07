@@ -213,7 +213,7 @@ export default function createForumRouter({ openai, es }) {
 
             res.json(pixData);
         } catch (error) {
-            console.error('Erro ao criar PIX:', error);
+            console.error('Erro ao criar PIX - errou teste:', error);
             console.error('Detalhes do erro:', error.response?.data || error.message);
             res.status(500).json({ 
                 error: 'Erro interno do servidor', 
@@ -370,8 +370,8 @@ export default function createForumRouter({ openai, es }) {
             } 
 
             res.json({
-                   status: "pending"
-                })
+                status: "pending"
+            })
 
             
         } catch (error) {
