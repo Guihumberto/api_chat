@@ -56,8 +56,7 @@ const corsOptions = {
     console.log("CORS origin:", origin);
     if (!origin) return callback(null, true);
 
-    const normalizedOrigin = origin.replace(/\/$/, ''); // remove barra final
-    if (allowedOrigins.includes(normalizedOrigin)) {
+    if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     } else {
       return callback(new Error("Not allowed by CORS"));
