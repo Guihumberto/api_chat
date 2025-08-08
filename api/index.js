@@ -726,15 +726,16 @@ const httpsOptions = {
   minVersion: 'TLSv1.2'
 }
 
+app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
 
 
-if (isDev) {
-  https.createServer(httpsOptions, app).listen(3001, () => {
-    console.log('HTTPS local em https://localhost:3001')
-  })
-} else {
-  app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
-}
+// if (isDev) {
+//   https.createServer(httpsOptions, app).listen(3001, () => {
+//     console.log('HTTPS local em https://localhost:3001')
+//   })
+// } else {
+//   app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+// }
 
 // Para Vercel, exporte o app
 export default app;
