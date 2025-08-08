@@ -1,6 +1,10 @@
 import express from "express";
+import fs from "fs"
+import https from "https"
 import { Client as ElasticClient } from "@elastic/elasticsearch";
 import cors from "cors";
+import helmet from 'helmet'
+import rateLimit from 'express-rate-limit'
 import dotenv from "dotenv";
 import { OpenAI } from "openai";
 import { CharacterTextSplitter } from "langchain/text_splitter";
@@ -9,11 +13,37 @@ import { OpenAIEmbeddings } from "@langchain/openai";
 const app = express();
 dotenv.config();
 
+// Middleware de segurança
+app.use((req, res, next) => {
+  // Force HTTPS
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  
+  // Outros headers de segurança
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  
+  next();
+});
+
+app.use(helmet())
+app.use(
+  helmet.contentSecurityPolicy({
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "https://sdk.mercadopago.com"],
+      connectSrc: ["'self'", "https://api.mercadopago.com"],
+      frameSrc: ["'self'", "https://www.mercadopago.com", "https://sdk.mercadopago.com"],
+    },
+  })
+)
+
 const allowedOrigins = [
   "https://leges.estudodalei.com.br",
   "https://legislacao.estudodalei.com.br",
   "https://www.leges.estudodalei.com.br",
   "http://localhost:3000",
+  "https://localhost:3000",
   "https://www.amapa.estudodalei.com.br"
 ];
 
@@ -37,6 +67,22 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
+
+const paymentLimiter = rateLimit({
+  windowMs: 60_000, // 1 minuto
+  max: 10, // limite por IP
+  message: { error: 'Too many requests, try again later.' },
+})
+
+app.use((req, res, next) => {
+  if (req.body && typeof req.body === 'object') {
+    const sensitive = ['card_number', 'cardNumber', 'security_code', 'cvv', 'expiry', 'expiration_date']
+    for (const k of sensitive) {
+      if (Object.prototype.hasOwnProperty.call(req.body, k)) req.body[k] = '[FILTERED]'
+    }
+  }
+  next()
+})
 
 //importar rotas
 import concusoRoutes from '../routes/concurso.js'
@@ -63,7 +109,7 @@ const model = new OpenAIEmbeddings({
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 app.get("/", (req, res) => {
-    res.send("Uhu, O servidor está rodando! 🚀\nComo posso te ajudar com a legislação hoje?");
+    res.send("Uhu, O servidor HTTPS funcionando!! 🚀\nComo posso te ajudar com a legislação hoje?");
 });
 
 // Rotas
@@ -670,8 +716,25 @@ app.post('/sendMsgWhats', async (req, res) => {
 });
 
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+const PORT = process.env.PORT || 3001
+const isDev = process.env.NODE_ENV === 'development'
+const onVercel = process.env.VERCEL === '1' // Vercel define essa var em runtime
+
+const httpsOptions = {
+  key: fs.readFileSync('./certs/localhost+2-key.pem'),
+  cert: fs.readFileSync('./certs/localhost+2.pem'),
+  minVersion: 'TLSv1.2'
+}
+
+
+
+if (isDev) {
+  https.createServer(httpsOptions, app).listen(3001, () => {
+    console.log('HTTPS local em https://localhost:3001')
+  })
+} else {
+  app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+}
 
 // Para Vercel, exporte o app
 export default app;

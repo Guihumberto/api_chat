@@ -134,6 +134,42 @@ const getAssinaturasPorUserId = async (esClient, idUser) => {
     }
 }
 
+const isValidEmail = (email) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  return emailRegex.test(email)
+}
+
+// Gera referência externa única
+const generateExternalReference = () => {
+  return `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+}
+
+// Gera chave de idempotência
+const generateIdempotencyKey = () => {
+  return `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+}
+
+// Converte erros internos em mensagens públicas
+const getPublicErrorMessage = (error) => {
+  const publicMessages = {
+    'invalid_card_data': 'Dados do cartão inválidos',
+    'card_expired': 'Cartão expirado',
+    'insufficient_funds': 'Fundos insuficientes',
+    'invalid_cvv': 'Código de segurança inválido',
+    'rejected_call_for_authorize': 'Transação rejeitada, entre em contato com seu banco',
+    'rejected_insufficient_amount': 'Valor insuficiente na conta',
+    'rejected_other_reason': 'Transação rejeitada'
+  }
+  
+  // Verifica se é um erro conhecido do Mercado Pago
+  if (error.cause && error.cause.length > 0) {
+    const cause = error.cause[0]
+    return publicMessages[cause.code] || 'Erro no processamento do pagamento'
+  }
+  
+  return 'Erro interno do servidor'
+}
+
 export default function createForumRouter({ openai, es }) {
     const router = Router();
 
@@ -225,48 +261,144 @@ export default function createForumRouter({ openai, es }) {
     // Criar preferência Cartão de Crédito
     router.post('/create-card', async (req, res) => {
         try {
-            const { amount, email, installments = 1, description = process.env.PRODUCT_NAME } = req.body;
+            console.log('Processing payment request')
+            const { token, issuer_id, payment_method_id, transaction_amount, installments, payer, paymentType, selectedPaymentMethod } = req.body
 
-            const preferenceData = {
-            items: [{
-                title: description,
-                unit_price: parseFloat(amount),
-                quantity: 1,
-                currency_id: 'BRL'
-            }],
-            payer: {
-                email: email
-            },
-            payment_methods: {
-                excluded_payment_methods: [],
-                excluded_payment_types: [
-                { id: 'ticket' },
-                { id: 'bank_transfer' },
-                { id: 'atm' }
-                ],
-                installments: parseInt(installments),
-                default_payment_method_id: null
-            },
-            back_urls: {
-                success: `${process.env.FRONTEND_URL}/payment/success`,
-                failure: `${process.env.FRONTEND_URL}/payment/failure`,
-                pending: `${process.env.FRONTEND_URL}/payment/pending`
-            },
-            auto_return: 'approved',
-            external_reference: `card_${Date.now()}`
-            };
+            if (!token || !payment_method_id || !transaction_amount || !payer) {
+                return res.status(400).json({
+                    error: 'Missing required fields',
+                    required: ['token', 'payment_method_id', 'transaction_amount', 'payer']
+                })
+            }
 
-            const result = await preference.create({ body: preferenceData });
+            if (!payer.email || !isValidEmail(payer.email)) {
+                return res.status(400).json({
+                    error: 'Invalid email format'
+                })
+            }
+
+            if (!payer.identification || !payer.identification.type || !payer.identification.number) {
+                return res.status(400).json({
+                    error: 'Invalid identification data'
+                })
+            }
+
+            // const preferenceData = {
+            //     items: [{
+            //         title: description,
+            //         unit_price: parseFloat(amount),
+            //         quantity: 1,
+            //         currency_id: 'BRL'
+            //     }],
+            //     payer: {
+            //         email: email
+            //     },
+            //     payment_methods: {
+            //         excluded_payment_methods: [],
+            //         excluded_payment_types: [
+            //         { id: 'ticket' },
+            //         { id: 'bank_transfer' },
+            //         { id: 'atm' }
+            //         ],
+            //         installments: parseInt(installments),
+            //         default_payment_method_id: null
+            //     },
+            //     back_urls: {
+            //         success: `${process.env.FRONTEND_URL}/payment/success`,
+            //         failure: `${process.env.FRONTEND_URL}/payment/failure`,
+            //         pending: `${process.env.FRONTEND_URL}/payment/pending`
+            //     },
+            //     auto_return: 'approved',
+            //     external_reference: `card_${Date.now()}`
+            // };
+
+            const paymentData = {
+                token, // Token seguro gerado pelo Secure Fields
+                issuer_id: parseInt(issuer_id),
+                payment_method_id,
+                transaction_amount: Number(transaction_amount),
+                installments: Number(installments) || 1,
+                payer: {
+                    email: payer.email.toLowerCase().trim(),
+                    identification: {
+                        type: payer.identification.type,
+                        number: payer.identification.number.replace(/\D/g, '')
+                    }
+                },
+                // Dados adicionais para compliance
+                description: 'Assinatura Estudo da Lei',
+                external_reference: generateExternalReference(),
+                notification_url: process.env.WEBHOOK_URL, // Para webhooks
+                statement_descriptor: 'Leges: Estudo da lei'
+            }
+
+             console.log('Payment data prepared:', {
+                payment_method_id: paymentData.payment_method_id,
+                transaction_amount: paymentData.transaction_amount,
+                installments: paymentData.installments,
+                external_reference: paymentData.external_reference
+            })
+
+            const result = await payment.create({
+                body: paymentData,
+                requestOptions: {
+                    idempotencyKey: generateIdempotencyKey()
+                }
+            })
+
+            console.log('Payment processed:', {
+                id: result.id,
+                status: result.status,
+                status_detail: result.status_detail
+            })
+
+            // Resposta segura para o frontend
+            const safeResponse = {
+                id: result.id,
+                status: result.status,
+                status_detail: result.status_detail,
+                transaction_amount: result.transaction_amount,
+                currency_id: result.currency_id,
+                date_created: result.date_created,
+                payment_method_id: result.payment_method_id,
+                installments: result.installments
+            }
+
+            const safeResponse2 = {
+                id: result.id,
+                status: result.status,
+                status_detail: result.status_detail,
+                amount: result.transaction_amount,
+                currency: result.currency_id,
+                payment_method: result.payment_method_id,
+                external_reference: paymentData.external_reference,
+                date_created: result.date_created || new Date(),
+                date_approved: result.date_approved || new Date()
+            }
+
+            if(safeResponse.status === 'approved') {
+                await setAssinaturas(safeResponse2, payer.id, es)
+                res.json({
+                   status: "ok"
+                })
+                return
+            } 
             
-            res.json({
-            id: result.id,
-            init_point: result.init_point,
-            sandbox_init_point: result.sandbox_init_point,
-            external_reference: result.external_reference
-            });
+            res.json(safeResponse)
+            
         } catch (error) {
-            console.error('Erro ao criar pagamento cartão:', error);
-            res.status(500).json({ error: 'Erro interno do servidor', details: error.message });
+            console.error('Payment processing error:', {
+                message: error.message,
+                status: error.status,
+                timestamp: new Date().toISOString()
+            })
+    
+            // Resposta de erro genérica
+            res.status(500).json({
+                error: 'Payment processing failed',
+                message: getPublicErrorMessage(error),
+                timestamp: new Date().toISOString()
+            })
         }
     });
 
