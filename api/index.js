@@ -716,17 +716,16 @@ app.post('/sendMsgWhats', async (req, res) => {
 });
 
 
-const PORT = process.env.PORT || 3001
-const isDev = process.env.NODE_ENV === 'development'
-const onVercel = process.env.VERCEL === '1' // Vercel define essa var em runtime
+// const PORT = process.env.PORT || 3001
+// const isDev = process.env.NODE_ENV === 'development'
+// const onVercel = process.env.VERCEL === '1' // Vercel define essa var em runtime
 
-const httpsOptions = {
-  key: fs.readFileSync('./certs/localhost+2-key.pem'),
-  cert: fs.readFileSync('./certs/localhost+2.pem'),
-  minVersion: 'TLSv1.2'
-}
+// const httpsOptions = {
+//   key: fs.readFileSync('./certs/localhost+2-key.pem'),
+//   cert: fs.readFileSync('./certs/localhost+2.pem'),
+//   minVersion: 'TLSv1.2'
+// }
 
-app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
 
 
 // if (isDev) {
