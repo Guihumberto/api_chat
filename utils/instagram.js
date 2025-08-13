@@ -61,4 +61,4 @@ function copyUrl() {
 }
 
 // Auto-redirect após 3 segundos
-setTimeout(openBrowser, 3000);
+// setTimeout(openBrowser, 3000);
