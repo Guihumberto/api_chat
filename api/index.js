@@ -123,7 +123,8 @@ app.get("/app", (req, res, next) => {
     if (!isInstagram) {   
       return res.send(getInstagramRedirectHTML(fullUrl));
     } else {
-      return res.redirect(fullUrl);
+      return res.send(getInstagramRedirectHTML(fullUrl));
+      // return res.redirect(fullUrl);
     }
 });
 
