@@ -113,7 +113,7 @@ app.get("/", (req, res, next) => {
     res.send("Uhu, O servidor HTTPS funcionando!! 🚀\nComo posso te ajudar com a legislação hoje?");
 });
 
-app.get("/app", (req, res, next) => {
+app.get("/app", (req, res) => {
     const userAgent = req.get('User-Agent') || '';
     const isInstagram = userAgent.includes('Instagram') || 
                       userAgent.includes('FBAN') || 
@@ -122,6 +122,21 @@ app.get("/app", (req, res, next) => {
     
     if (isInstagram) {   
       return res.send(getInstagramRedirectHTML(fullUrl));
+    } else {
+      // return res.send(getInstagramRedirectHTML(fullUrl));
+      return res.redirect(fullUrl);
+    }
+});
+
+app.get("/app/instructions", (req, res) => {
+    const userAgent = req.get('User-Agent') || '';
+    const isInstagram = userAgent.includes('Instagram') || 
+                      userAgent.includes('FBAN') || 
+                      userAgent.includes('FBAV');
+    const fullUrl = 'https://leges.estudodalei.com.br/landingpage';
+    
+    if (!isInstagram) {   
+      return res.send(criarPaginaInstrucoes());
     } else {
       // return res.send(getInstagramRedirectHTML(fullUrl));
       return res.redirect(fullUrl);
@@ -1001,7 +1016,7 @@ function getInstagramRedirectHTML(fullUrl) {
 
         <input type="text" id="linkInput" value="https://leges.estudodalei.com.br/landingpage" readonly style="width: 300px;">
         
-        <a href="https://leges.estudodalei.com.br/landingpage" target="_blank" rel="noopener noreferrer" class="btn btn-primary">
+        <a href="https://app.estudodalei.com.br/app/instructions" class="btn btn-primary">
           Abrir no navegador
         </a>
 
@@ -1025,20 +1040,288 @@ function getInstagramRedirectHTML(fullUrl) {
   `;
 }
 
-// app.get('*', (req, res, next) => {
-//   const userAgent = req.get('User-Agent') || '';
-//   const isInstagram = userAgent.includes('Instagram') || 
-//                      userAgent.includes('FBAN') || 
-//                      userAgent.includes('FBAV');
-  
-//   if (!isInstagram) {
-//     // Serve HTML simples em vez do Vue
-//     return res.send(getInstagramRedirectHTML(req.get('host') + req.originalUrl));
-//   }
-  
-//   // Continue normal para outros navegadores
-//   next();
-// });
+function criarPaginaInstrucoes() {
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Como Abrir no Navegador</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: white;
+        }
+        
+        .container {
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+        }
+        
+        .header {
+            margin-bottom: 30px;
+        }
+        
+        .title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        
+        .instruction-area {
+            position: relative;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .browser-mockup {
+            width: 100%;
+            height: 60px;
+            background: #f8f9fa;
+            border-radius: 12px 12px 0 0;
+            position: relative;
+            margin-bottom: 20px;
+            border: 2px solid #e9ecef;
+        }
+        
+        .browser-header {
+            height: 40px;
+            background: #e9ecef;
+            border-radius: 10px 10px 0 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 15px;
+        }
+        
+        .browser-dots {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #7d8083ff;
+        }
+        
+        .menu-icon {
+            paddings: 2px;
+            width: 20px;
+            height: 20px;
+            background: #495057;
+            border-radius: 3px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .arrow {
+            position: absolute;
+            top: -35px;
+            right: 35px;
+            width: 60px;
+            height: 50px;
+            z-index: 10;
+        }
+
+        .arrow::before {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 45px;
+            height: 35px;
+            border: 3px solid #ff4757;
+            border-right: none;
+            border-top: none;
+            border-radius: 0 0 0 25px;
+            transform: rotate(-45deg);
+            animation: arrowPulse 2s infinite ease-in-out;
+        }
+
+        .arrow::after {
+            content: '';
+            position: absolute;
+            bottom: 20px; /* Ajustado para subir a ponta */
+            right: -10px; /* Ajustado para colar na linha */
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-bottom: 15px solid #ff4757; /* Alterado para apontar para cima */
+            animation: arrowTip 2s infinite ease-in-out;
+            filter: drop-shadow(0 0 8px rgba(255, 71, 87, 0.6));
+        }
+        
+        @keyframes arrowPulse {
+            0%, 100% {
+                opacity: 0.7;
+                transform: rotate(-45deg) scale(1);
+                filter: drop-shadow(0 0 5px rgba(255, 71, 87, 0.4));
+            }
+            50% {
+                opacity: 1;
+                transform: rotate(-45deg) scale(1.1);
+                filter: drop-shadow(0 0 15px rgba(255, 71, 87, 0.8));
+            }
+        }
+        
+        @keyframes arrowTip {
+            0%, 100% {
+                opacity: 0.8;
+                transform: scale(1);
+                filter: drop-shadow(0 0 8px rgba(255, 71, 87, 0.6));
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1.2);
+                filter: drop-shadow(0 0 20px rgba(255, 71, 87, 1));
+            }
+        }
+        
+        .instruction-text {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #fff;
+        }
+        
+        .step-text {
+            font-size: 14px;
+            opacity: 0.9;
+            line-height: 1.5;
+        }
+        
+        .highlight {
+            color: #ffd93d;
+            font-weight: bold;
+        }
+        
+        .steps {
+            text-align: left;
+            margin-top: 20px;
+        }
+        
+        .step {
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            border-left: 4px solid #ffd93d;
+        }
+        
+        .step-number {
+            font-weight: bold;
+            color: #ffd93d;
+        }
+        
+        .back-button {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a6f);
+            border: none;
+            color: white;
+            padding: 15px 30px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        
+        .back-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+        
+        @media (max-width: 480px) {
+            .title {
+                font-size: 20px;
+            }
+            
+            .instruction-text {
+                font-size: 16px;
+            }
+            
+            .container {
+                max-width: 350px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="instruction-area">
+            <div class="browser-mockup">
+                <div class="browser-header">
+                    <div class="menu-icon">
+                      <span>X</span>
+                    </div>
+                    <div class="browser-dots">
+                        <div class="dot"></div>
+                        <div class="dot"></div>
+                        <div class="dot"></div>
+                    </div>
+                </div>
+                <div class="arrow"></div>
+            </div>
+        </div>
+        
+        <div class="header">
+            <div class="title">📱 Como Abrir no Navegador</div>
+            <div class="subtitle">Siga os passos abaixo para uma melhor experiência</div>
+        </div>
+        
+        <div style="margin-top: 20px;">
+            <div class="instruction-text">
+                👆 <span class="highlight">Clique nos 3 pontos</span> no canto superior direito
+            </div></div>
+            
+            <div class="steps">
+                <div class="step">
+                    <span class="step-number">1.</span> Toque nos <span class="highlight">três pontos (⋮)</span> no canto superior direito
+                </div>
+                <div class="step">
+                    <span class="step-number">2.</span> Selecione <span class="highlight">"Abrir no navegador externo"</span>
+                </div>
+                <div class="step">
+                    <span class="step-number">3.</span> Aproveite a <span class="highlight">experiência completa</span> do nosso site!
+                </div>
+            </div>
+        </div>
+
+        <a href="https://app.estudodalei.com.br/app" class="back-button">
+          Voltar
+        </a>
+    </div>
+    <script src="/utils/instagram.js"></script>
+</body>
+</html>`;
+}
 
 const PORT = process.env.PORT || 3001
 const isDev = process.env.NODE_ENV === 'development'
