@@ -715,70 +715,207 @@ app.post('/sendMsgWhats', async (req, res) => {
   }
 });
 
+// instagram
 app.get('/open-in-browser', (req, res) => {
   const targetUrl = req.query.url || 'https://leges.estudodalei.com.br/landingpage';
-
+  const userAgent = req.headers['user-agent'] || '';
+  
+  // Detecta se é iOS ou Android
+  const isIOS = /iPhone|iPad|iPod/i.test(userAgent);
+  const isAndroid = /Android/i.test(userAgent);
+  
   res.send(`
+    <!DOCTYPE html>
     <html>
       <head>
+        <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Abrindo no navegador...</title>
+        <title>Redirecionando...</title>
         <style>
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
           body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            padding: 40px;
-            background: #f9f9f9;
-            color: #333;
-          }
-          .card {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            display: inline-block;
-            max-width: 400px;
-          }
-          button {
-            background: #007aff;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            border: none;
-            padding: 12px 20px;
-            margin-top: 15px;
-            border-radius: 8px;
-            font-size: 16px;
-            cursor: pointer;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
           }
-          button:hover {
-            background: #005bb5;
+          .container {
+            background: rgba(255, 255, 255, 0.95);
+            color: #333;
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+            max-width: 400px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+          }
+          .icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+          }
+          h1 {
+            font-size: 24px;
+            margin-bottom: 15px;
+            color: #2c3e50;
+          }
+          p {
+            margin-bottom: 25px;
+            line-height: 1.5;
+            color: #7f8c8d;
+          }
+          .btn {
+            display: inline-block;
+            background: #3498db;
+            color: white;
+            padding: 15px 30px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: bold;
+            margin: 10px;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+          }
+          .btn:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+          }
+          .btn-secondary {
+            background: #95a5a6;
+          }
+          .btn-secondary:hover {
+            background: #7f8c8d;
+          }
+          .steps {
+            text-align: left;
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+          }
+          .steps h3 {
+            margin-bottom: 10px;
+            color: #2c3e50;
+          }
+          .steps ol {
+            margin-left: 20px;
+          }
+          .steps li {
+            margin: 5px 0;
+            color: #555;
           }
         </style>
       </head>
       <body>
-        <div class="card">
-          <h2>🚀 Abrindo no navegador externo...</h2>
-          <p>Se não abrir automaticamente, toque no botão abaixo:</p>
-          <button onclick="openExternal()">Abrir no navegador</button>
+        <div class="container">
+          <div class="icon">🚀</div>
+          <h1>Abrir no navegador</h1>
+          <p>Para uma melhor experiência, abra este link no seu navegador padrão.</p>
+          
+          <button class="btn" onclick="openInBrowser()">
+            Abrir no navegador
+          </button>
+          
+          <button class="btn btn-secondary" onclick="copyLink()">
+            Copiar link
+          </button>
+          
+          <div class="steps">
+            <h3>Ou siga os passos:</h3>
+            <ol>
+              <li>Toque nos três pontos (⋯) no canto superior</li>
+              <li>Selecione "Abrir no navegador" ou "Abrir no Chrome/Safari"</li>
+            </ol>
+          </div>
         </div>
 
         <script>
-          const url = "${targetUrl}";
-          const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-          function openExternal() {
-            if (isIOS) {
-              window.open(url, "_blank");
-            } else {
-              window.location = url;
+          // Definir variáveis globais primeiro
+          const targetUrl = "${targetUrl}";
+          const isIOS = ${isIOS};
+          const isAndroid = ${isAndroid};
+          
+          // Garantir que as funções sejam globais
+          window.openInBrowser = function() {
+            try {
+              if (isIOS) {
+                // Para iOS - tenta diferentes métodos
+                window.location.href = targetUrl;
+                setTimeout(() => {
+                  window.open(targetUrl, '_blank');
+                }, 100);
+              } else if (isAndroid) {
+                // Para Android
+                window.open(targetUrl, '_blank', 'noopener,noreferrer');
+              } else {
+                window.location.href = targetUrl;
+              }
+            } catch (error) {
+              console.log('Erro ao abrir:', error);
+              copyLink();
             }
           }
-
-          // Tenta abrir automaticamente
-          setTimeout(openExternal, 1000);
+          
+          window.copyLink = function() {
+            if (navigator.clipboard) {
+              navigator.clipboard.writeText(targetUrl).then(() => {
+                alert('Link copiado! Cole no seu navegador.');
+              });
+            } else {
+              // Fallback para navegadores mais antigos
+              const textArea = document.createElement('textarea');
+              textArea.value = targetUrl;
+              document.body.appendChild(textArea);
+              textArea.focus();
+              textArea.select();
+              try {
+                document.execCommand('copy');
+                alert('Link copiado! Cole no seu navegador.');
+              } catch (err) {
+                console.error('Erro ao copiar:', err);
+              }
+              document.body.removeChild(textArea);
+            }
+          }
+          
+          // Tenta abrir automaticamente após 2 segundos
+          setTimeout(() => {
+            window.openInBrowser();
+          }, 2000);
+          
+          // Detecta se conseguiu sair do app
+          let hidden = false;
+          document.addEventListener('visibilitychange', () => {
+            if (document.hidden && !hidden) {
+              hidden = true;
+              // Se a página ficou oculta, provavelmente conseguiu abrir o navegador
+              console.log('Página oculta - redirecionamento bem-sucedido');
+            }
+          });
         </script>
       </body>
     </html>
   `);
+});
+
+// Rota alternativa - página dedicada de redirecionamento
+app.get('/redirect', (req, res) => {
+  const targetUrl = req.query.url;
+  
+  if (!targetUrl) {
+    return res.redirect('/');
+  }
+  
+  // Serve a mesma página de redirecionamento
+  res.redirect(`/open-in-browser?url=${encodeURIComponent(targetUrl)}`);
 });
 
 
