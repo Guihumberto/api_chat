@@ -715,6 +715,72 @@ app.post('/sendMsgWhats', async (req, res) => {
   }
 });
 
+app.get('/open-in-browser', (req, res) => {
+  const targetUrl = req.query.url || 'https://leges.estudodalei.com.br/landingpage';
+
+  res.send(`
+    <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Abrindo no navegador...</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 40px;
+            background: #f9f9f9;
+            color: #333;
+          }
+          .card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            display: inline-block;
+            max-width: 400px;
+          }
+          button {
+            background: #007aff;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            margin-top: 15px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+          }
+          button:hover {
+            background: #005bb5;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <h2>🚀 Abrindo no navegador externo...</h2>
+          <p>Se não abrir automaticamente, toque no botão abaixo:</p>
+          <button onclick="openExternal()">Abrir no navegador</button>
+        </div>
+
+        <script>
+          const url = "${targetUrl}";
+          const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+          function openExternal() {
+            if (isIOS) {
+              window.open(url, "_blank");
+            } else {
+              window.location = url;
+            }
+          }
+
+          // Tenta abrir automaticamente
+          setTimeout(openExternal, 1000);
+        </script>
+      </body>
+    </html>
+  `);
+});
+
 
 // const PORT = process.env.PORT || 3001
 // const isDev = process.env.NODE_ENV === 'development'
