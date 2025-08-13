@@ -120,7 +120,7 @@ app.get("/app", (req, res) => {
                       userAgent.includes('FBAV');
     const fullUrl = 'https://leges.estudodalei.com.br/landingpage';
     
-    if (!isInstagram) {   
+    if (isInstagram) {   
       return res.send(getInstagramRedirectHTML(fullUrl));
     } else {
       // return res.send(getInstagramRedirectHTML(fullUrl));
