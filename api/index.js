@@ -110,20 +110,22 @@ const model = new OpenAIEmbeddings({
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 app.get("/", (req, res, next) => {
+    res.send("Uhu, O servidor HTTPS funcionando!! 🚀\nComo posso te ajudar com a legislação hoje?");
+});
+
+app.get("/app", (req, res, next) => {
     const userAgent = req.get('User-Agent') || '';
     const isInstagram = userAgent.includes('Instagram') || 
                       userAgent.includes('FBAN') || 
                       userAgent.includes('FBAV');
+    const fullUrl = 'https://leges.estudodalei.com.br/landingpage';
     
-    if (!isInstagram) {
-      // Serve HTML simples em vez do Vue
-      const fullUrl = 'https://leges.estudodalei.com.br/landingpage';
+    if (!isInstagram) {   
       return res.send(getInstagramRedirectHTML(fullUrl));
+    } else {
+      window.location.href = encodeURIComponent(fullUrl);
+      return 
     }
-    
-    // Continue normal para outros navegadores
-    next();
-    res.send("Uhu, O servidor HTTPS funcionando!! 🚀\nComo posso te ajudar com a legislação hoje?");
 });
 
 // Rotas
@@ -1038,17 +1040,15 @@ function getInstagramRedirectHTML(fullUrl) {
 //   next();
 // });
 
-// const PORT = process.env.PORT || 3001
-// const isDev = process.env.NODE_ENV === 'development'
-// const onVercel = process.env.VERCEL === '1' // Vercel define essa var em runtime
+const PORT = process.env.PORT || 3001
+const isDev = process.env.NODE_ENV === 'development'
+const onVercel = process.env.VERCEL === '1' // Vercel define essa var em runtime
 
 // const httpsOptions = {
 //   key: fs.readFileSync('./certs/localhost+2-key.pem'),
 //   cert: fs.readFileSync('./certs/localhost+2.pem'),
 //   minVersion: 'TLSv1.2'
 // }
-
-
 
 // if (isDev) {
 //   https.createServer(httpsOptions, app).listen(3001, () => {
