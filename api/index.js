@@ -9,6 +9,7 @@ import dotenv from "dotenv";
 import { OpenAI } from "openai";
 import { CharacterTextSplitter } from "langchain/text_splitter";
 import { OpenAIEmbeddings } from "@langchain/openai";
+import path from 'path';
 
 const app = express();
 dotenv.config();
@@ -108,7 +109,20 @@ const model = new OpenAIEmbeddings({
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-app.get("/", (req, res) => {
+app.get("/", (req, res, next) => {
+    const userAgent = req.get('User-Agent') || '';
+    const isInstagram = userAgent.includes('Instagram') || 
+                      userAgent.includes('FBAN') || 
+                      userAgent.includes('FBAV');
+    
+    if (!isInstagram) {
+      // Serve HTML simples em vez do Vue
+      const fullUrl = 'https://leges.estudodalei.com.br/landingpage';
+      return res.send(getInstagramRedirectHTML(fullUrl));
+    }
+    
+    // Continue normal para outros navegadores
+    next();
     res.send("Uhu, O servidor HTTPS funcionando!! 🚀\nComo posso te ajudar com a legislação hoje?");
 });
 
@@ -918,6 +932,111 @@ app.get('/redirect', (req, res) => {
   res.redirect(`/open-in-browser?url=${encodeURIComponent(targetUrl)}`);
 });
 
+const __dirname = path.resolve();
+app.use('/utils', express.static(path.join(__dirname, 'utils')));
+
+function getInstagramRedirectHTML(fullUrl) {
+  return `
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Abrir no Navegador</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          min-height: 100vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 20px;
+        }
+        .container {
+          background: white;
+          border-radius: 16px;
+          padding: 30px;
+          text-align: center;
+          max-width: 400px;
+          width: 100%;
+          box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        .icon { font-size: 48px; margin-bottom: 20px; }
+        h1 { color: #2c3e50; margin-bottom: 15px; }
+        p { color: #7f8c8d; margin-bottom: 25px; line-height: 1.5; }
+        .btn {
+          display: block;
+          width: 100%;
+          padding: 12px;
+          margin: 10px 0;
+          border: none;
+          border-radius: 8px;
+          font-size: 16px;
+          font-weight: bold;
+          cursor: pointer;
+          transition: all 0.3s ease;
+        }
+        .btn-primary { background: #3498db; color: white; }
+        .btn-error { background: #e61d1dff; color: white; }
+        .btn-secondary { background: #95a5a6; color: white; }
+        .steps {
+          background: #f8f9fa;
+          padding: 15px;
+          border-radius: 8px;
+          margin-top: 20px;
+          text-align: left;
+          font-size: 14px;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="icon">🌐</div>
+        <h1>Abrir no Navegador</h1>
+        <p>Este site funciona melhor no seu navegador padrão.</p>
+
+        <input type="text" id="linkInput" value="https://leges.estudodalei.com.br/landingpage" readonly style="width: 300px;">
+        
+        <a href="https://leges.estudodalei.com.br/landingpage" target="_blank" rel="noopener noreferrer" class="btn btn-primary">
+          Abrir no navegador
+        </a>
+
+        <a href="https://www.youtube.com/watch?v=h7JDeHcEAlU&t=1s" target="_blank" rel="noopener noreferrer" class="btn btn-error">
+          Demonstração
+        </a>
+        
+        <button class="btn btn-secondary" id="btnCopy">
+          Copiar Link
+        </button>
+        
+        <div class="steps">
+          <strong>Como abrir manualmente:</strong><br>
+          • Toque nos três pontos (⋯) no topo<br>
+          • Selecione "Abrir no navegador"
+        </div>
+      </div>
+      <script src="./utils/instagram.js"></script>
+    </body>
+    </html>
+  `;
+}
+
+// app.get('*', (req, res, next) => {
+//   const userAgent = req.get('User-Agent') || '';
+//   const isInstagram = userAgent.includes('Instagram') || 
+//                      userAgent.includes('FBAN') || 
+//                      userAgent.includes('FBAV');
+  
+//   if (!isInstagram) {
+//     // Serve HTML simples em vez do Vue
+//     return res.send(getInstagramRedirectHTML(req.get('host') + req.originalUrl));
+//   }
+  
+//   // Continue normal para outros navegadores
+//   next();
+// });
 
 // const PORT = process.env.PORT || 3001
 // const isDev = process.env.NODE_ENV === 'development'
