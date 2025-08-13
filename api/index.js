@@ -970,8 +970,8 @@ function getInstagramRedirectHTML(fullUrl) {
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(10px);
             border-radius: 20px;
-            padding: 20px;
-            margin-bottom: 10px;
+            padding: 10px;
+            margin-bottom: 5px;
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
         
@@ -1117,7 +1117,7 @@ function getInstagramRedirectHTML(fullUrl) {
             font-weight: bold;
             color: #ffd93d;
         }
-        .icon { font-size: 48px; margin-bottom: 20px; }
+        .icon { font-size: 38px; margin-bottom: 15px; }
         h1 { color: #2c3e50; margin-bottom: 15px; }
         p { color: #7f8c8d; margin-bottom: 25px; line-height: 1.5; }
         .btn {
@@ -1158,7 +1158,6 @@ function getInstagramRedirectHTML(fullUrl) {
                         <div class="dot"></div>
                     </div>
                 </div>
-                <div class="arrow"></div>
             </div>
         </div>
         <div class="icon">🌐</div>
