@@ -123,8 +123,7 @@ app.get("/app", (req, res, next) => {
     if (!isInstagram) {   
       return res.send(getInstagramRedirectHTML(fullUrl));
     } else {
-      window.location.href = encodeURIComponent(fullUrl);
-      return 
+      return res.redirect(fullUrl);
     }
 });
 
@@ -1019,7 +1018,7 @@ function getInstagramRedirectHTML(fullUrl) {
           • Selecione "Abrir no navegador"
         </div>
       </div>
-      <script src="./utils/instagram.js"></script>
+      <script src="/utils/instagram.js"></script>
     </body>
     </html>
   `;
