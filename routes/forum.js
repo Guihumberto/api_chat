@@ -681,6 +681,115 @@ export default function createForumRouter({ openai, es }) {
       }
     });
 
+    router.post('/analise_texto', validateApiKey, async (req, res) => {
+      const { textAnalise, art, dispositivo, norma } = req.body;
+
+      if (!textAnalise) {
+        return res.status(400).json({ error: 'Campos obrigatórios.' });
+      }
+
+      if (textAnalise.length > 50000) {
+        return res.status(400).json({
+          error: 'Texto muito longo',
+          message: 'O texto deve ter no máximo 50.000 caracteres'
+        });
+      }
+
+      try {
+        console.log('Fazendo chamada para API Anthropic...');
+        
+        // Construir o prompt estruturado
+        const prompt = `
+          Você é um especialista em análise jurídica. Sua tarefa é analisar e melhorar o texto fornecido, seguindo estas instruções específicas:
+
+          **CONTEXTO JURÍDICO:**
+          - Norma: ${norma || 'Não especificada'}
+          - Artigo: ${art || 'Não especificado'}
+          - Dispositivo: ${dispositivo || 'Não especificado'}
+
+          **INSTRUÇÕES DE PROCESSAMENTO:**
+
+          1. **Melhoria do texto**: Corrija erros gramaticais, ortográficos e de pontuação. Melhore a clareza e fluidez do texto sem ser prolixo.
+
+          2. **Processamento de marcadores especiais**:
+            - Palavras com @ na frente (ex: @conceito): Forneça uma definição clara e concisa do conceito no contexto jurídico
+            - Palavras com @(instruções)conceito: Execute a instrução específica entre dos parenteses para o conceito marcado
+
+          3. **Formatação**: Retorne o texto em HTML bem estruturado com:
+            - Parágrafos organizados
+            - Definições de conceitos destacadas
+            - Estrutura clara e legível
+
+          4. **Contexto**: Mantenha todas as análises e melhorias dentro do contexto jurídico fornecido.
+
+          **TEXTO PARA ANÁLISE:**
+          ${textAnalise}
+
+          **FORMATO DE RESPOSTA:**
+          Retorne apenas o HTML formatado, sem explicações adicionais ou comentários fora do conteúdo solicitado.`;
+
+        const anthropicResponse = await callAnthropicAPI(prompt);
+        
+        // Extrair o conteúdo da resposta
+        let textoAnalisado = anthropicResponse.content?.[0]?.text || anthropicResponse.text || anthropicResponse;
+        
+        // Garantir que o texto está em formato HTML válido
+        if (!textoAnalisado.includes('<')) {
+          // Se não houver tags HTML, envolver em tags básicas
+          textoAnalisado = `<div class="analise-juridica">${textoAnalisado.replace(/\n/g, '<br>')}</div>`;
+        }
+
+        // Resposta de sucesso
+        res.status(200).json({
+          success: true,
+          data: {
+            textoOriginal: textAnalise,
+            textoAnalisado: textoAnalisado,
+            contexto: {
+              norma: norma || null,
+              artigo: art || null,
+              dispositivo: dispositivo || null
+            },
+            timestamp: new Date().toISOString(),
+            caracteres: {
+              original: textAnalise.length,
+              analisado: textoAnalisado.length
+            }
+          },
+          message: 'Análise de texto concluída com sucesso'
+        });
+
+      } catch (error) {
+        console.error('Erro na análise do texto legal:', error);
+        
+        if (error.response?.status === 401) {
+          return res.status(401).json({
+            error: 'Erro de autenticação',
+            message: 'Chave da API Anthropic inválida'
+          });
+        }
+
+        if (error.response?.status === 429) {
+          return res.status(429).json({
+            error: 'Limite de requisições excedido',
+            message: 'Muitas requisições. Tente novamente em alguns minutos.'
+          });
+        }
+
+        if (error.response?.status === 400) {
+          return res.status(400).json({
+            error: 'Erro na requisição',
+            message: 'Dados inválidos enviados para a API Anthropic'
+          });
+        }
+
+        res.status(500).json({
+          error: 'Erro interno do servidor',
+          message: error.message || 'Erro desconhecido na análise do texto'
+        });
+      }
+    });
+
     router.post('/chatquestion', validateApiKey, async (req, res) => {
         const { pergunta, banca, contexto, artigo, legislacao } = req.body;
         
