@@ -455,6 +455,305 @@ dotenv.config();
             return resposta; // Retorna sem formatação em caso de erro
         }
     }
+    
+    function generateSuggestions(legislacao, artigo, disciplina) {
+        const suggestions = [
+            `Revisar outros artigos da ${legislacao}`,
+            `Estudar jurisprudência relacionada ao artigo ${artigo}`,
+            `Praticar mais questões sobre o tema`
+        ];
+        
+        // Adicionar sugestões específicas da disciplina
+        if (disciplina) {
+            const disciplinaLower = disciplina.toLowerCase();
+            
+            if (disciplinaLower.includes('constitucional')) {
+                suggestions.push('Estudar precedentes do STF sobre o tema');
+                suggestions.push('Revisar ADI e ADPF relacionadas');
+            } else if (disciplinaLower.includes('administrativo')) {
+                suggestions.push('Consultar jurisprudência do STJ sobre atos administrativos');
+                suggestions.push('Estudar pareceres da AGU');
+            } else if (disciplinaLower.includes('penal')) {
+                suggestions.push('Analisar súmulas do STJ e STF');
+                suggestions.push('Revisar precedentes sobre o tipo penal');
+            } else if (disciplinaLower.includes('civil')) {
+                suggestions.push('Estudar enunciados das Jornadas de Direito Civil');
+                suggestions.push('Revisar jurisprudência do STJ');
+            } else if (disciplinaLower.includes('tributário') || disciplinaLower.includes('tributario')) {
+                suggestions.push('Consultar jurisprudência dos tribunais superiores');
+                suggestions.push('Estudar pareceres normativos da RFB');
+            } else if (disciplinaLower.includes('trabalhista') || disciplinaLower.includes('trabalho')) {
+                suggestions.push('Revisar súmulas do TST');
+                suggestions.push('Estudar orientações jurisprudenciais');
+            }
+            
+            suggestions.push(`Consultar doutrina especializada em ${disciplina}`);
+        } else {
+            suggestions.push('Consultar doutrina especializada');
+        }
+        
+        return suggestions.slice(0, 6); // Limitar a 6 sugestões
+    }
+
+    function generateRelatedTopics(contexto, legislacao, disciplina) {
+        const topics = [];
+        
+        // Tópicos baseados na disciplina
+        if (disciplina) {
+            const disciplinaLower = disciplina.toLowerCase();
+            
+            if (disciplinaLower.includes('constitucional')) {
+                topics.push('Direitos Fundamentais', 'Organização do Estado', 'Controle de Constitucionalidade', 'Federalismo', 'Processo Legislativo');
+            } else if (disciplinaLower.includes('administrativo')) {
+                topics.push('Atos Administrativos', 'Processo Administrativo', 'Responsabilidade Civil do Estado', 'Licitações e Contratos', 'Servidores Públicos');
+            } else if (disciplinaLower.includes('penal')) {
+                topics.push('Teoria Geral do Crime', 'Penas e Medidas de Segurança', 'Crimes em Espécie', 'Execução Penal', 'Lei de Drogas');
+            } else if (disciplinaLower.includes('civil')) {
+                topics.push('Contratos', 'Responsabilidade Civil', 'Direitos Reais', 'Família e Sucessões', 'Obrigações');
+            } else if (disciplinaLower.includes('processual civil')) {
+                topics.push('Processo de Conhecimento', 'Execução', 'Recursos', 'Procedimentos Especiais', 'Tutelas Provisórias');
+            } else if (disciplinaLower.includes('processual penal')) {
+                topics.push('Inquérito Policial', 'Ação Penal', 'Provas', 'Recursos', 'Execução Penal');
+            } else if (disciplinaLower.includes('tributário') || disciplinaLower.includes('tributario')) {
+                topics.push('Sistema Tributário Nacional', 'Obrigação Tributária', 'Crédito Tributário', 'Processo Administrativo Tributário', 'Execução Fiscal');
+            } else if (disciplinaLower.includes('trabalhista') || disciplinaLower.includes('trabalho')) {
+                topics.push('Contrato de Trabalho', 'Jornada de Trabalho', 'Salário e Remuneração', 'FGTS e Previdência', 'Processo do Trabalho');
+            } else if (disciplinaLower.includes('empresarial') || disciplinaLower.includes('comercial')) {
+                topics.push('Sociedades', 'Títulos de Crédito', 'Falência e Recuperação', 'Contratos Empresariais', 'Propriedade Industrial');
+            } else if (disciplinaLower.includes('ambiental')) {
+                topics.push('Princípios do Direito Ambiental', 'Licenciamento Ambiental', 'Responsabilidade Ambiental', 'Áreas Protegidas', 'Crimes Ambientais');
+            } else if (disciplinaLower.includes('previdenciário') || disciplinaLower.includes('previdenciario')) {
+                topics.push('Segurados do RGPS', 'Benefícios Previdenciários', 'Custeio da Previdência', 'Processo Previdenciário', 'Previdência do Servidor');
+            }
+        }
+        
+        // Se não conseguiu identificar pela disciplina, usar a legislação
+        if (topics.length === 0) {
+            const legislacaoLower = legislacao.toLowerCase();
+            if (legislacaoLower.includes('constituição') || legislacaoLower.includes('constitucional')) {
+                topics.push('Direitos Fundamentais', 'Organização do Estado', 'Controle de Constitucionalidade');
+            } else if (legislacaoLower.includes('código civil')) {
+                topics.push('Contratos', 'Responsabilidade Civil', 'Direitos Reais');
+            } else if (legislacaoLower.includes('código penal')) {
+                topics.push('Teoria Geral do Crime', 'Penas e Medidas de Segurança');
+            }
+        }
+        
+        // Adicionar tópicos baseados no contexto
+        if (contexto) {
+            const contextWords = contexto.toLowerCase();
+            if (contextWords.includes('servidor')) topics.push('Regime Jurídico dos Servidores');
+            if (contextWords.includes('licitação')) topics.push('Lei de Licitações');
+            if (contextWords.includes('improbidade')) topics.push('Lei de Improbidade Administrativa');
+            if (contextWords.includes('responsabilidade')) topics.push('Responsabilidade Civil e Administrativa');
+            if (contextWords.includes('processo')) topics.push('Direito Processual');
+            if (contextWords.includes('recurso')) topics.push('Teoria Geral dos Recursos');
+            if (contextWords.includes('execução')) topics.push('Processo de Execução');
+        }
+        
+        // Remover duplicatas e limitar
+        return [...new Set(topics)].slice(0, 8);
+    }
+
+    function inferDifficultyFromQuestion(pergunta, justificativa) {
+        const texto = (pergunta + ' ' + justificativa).toLowerCase();
+        
+        // Palavras que indicam alta dificuldade
+        const hardKeywords = [
+            'excepcionalmente', 'ressalvado', 'salvo', 'entretanto', 'contudo',
+            'jurisprudência', 'precedente', 'súmula', 'orientação jurisprudencial',
+            'interpretação', 'doutrina', 'teoria', 'princípio', 'exceção'
+        ];
+        
+        // Palavras que indicam dificuldade média
+        const mediumKeywords = [
+            'aplicação', 'procedimento', 'processo', 'requisito', 'condição',
+            'prazo', 'competência', 'atribuição', 'responsabilidade'
+        ];
+        
+        const hardCount = hardKeywords.filter(keyword => texto.includes(keyword)).length;
+        const mediumCount = mediumKeywords.filter(keyword => texto.includes(keyword)).length;
+        
+        if (hardCount >= 2) return 'dificil';
+        if (hardCount >= 1 || mediumCount >= 2) return 'medio';
+        return 'facil';
+    }
+
+    function formatDate(){
+            const now = new Date();
+            
+            const day = String(now.getDate()).padStart(2, '0');  // Garante 2 dígitos para o dia
+            const month = String(now.getMonth() + 1).padStart(2, '0');  // Meses começam em 0, então somamos 1
+            const year = now.getFullYear();
+            
+            const hours = String(now.getHours()).padStart(2, '0');  // Garante 2 dígitos para a hora
+            const minutes = String(now.getMinutes()).padStart(2, '0');  // Garante 2 dígitos para os minutos
+            
+            return `${day}-${month}-${year} ${hours}:${minutes}`;
+    }
+
+    async function indexQuestoesElastic(allSplits, id_law, id_art, list_arts, id_origin_law, disciplina, banca, es) {
+      try {
+          const dataAtual = new Date();
+          const ano = dataAtual.getFullYear();
+          const bulkOperations = [];
+
+          for (let i = 0; i < allSplits.length; i++) {
+              const questao = allSplits[i];
+              
+              // Validar estrutura da questão
+              if (!questao.pergunta || !questao.resposta || !questao.justificativa) {
+                  console.warn(`Questão ${i + 1} com estrutura inválida, pulando...`);
+                  continue;
+              }
+
+              const doc = {
+                  ...questao,
+                  id_origin_law: id_origin_law || null,
+                  id_law: id_law || null,
+                  id_art: id_art || null,
+                  list_arts: list_arts || [],
+                  tipo: 'c/e',
+                  date_created: Date.now(),
+                  created_by: 'admin',
+                  banca: banca || 'GERADA POR IA',
+                  id_disciplina: disciplina || null,
+                  concurso: 'GERADA POR IA',
+                  ano: ano,
+                  // Campos adicionais úteis
+                  status: 'ativa',
+                  difficulty_level: inferDifficultyFromQuestion(questao.pergunta, questao.justificativa),
+                  source_type: 'ai_generated',
+                  version: '1.0'
+              };
+
+              // Preparar para bulk insert
+              bulkOperations.push(
+                  { index: { _index: 'questoes' } },
+                  doc
+              );
+          }
+
+          if (bulkOperations.length > 0) {
+              // Usar bulk API para melhor performance
+              const bulkResponse = await es.bulk({
+                  refresh: true, // Refresh para disponibilizar imediatamente
+                  body: bulkOperations
+              });
+
+              // Verificar erros no bulk insert
+              if (bulkResponse.errors) {
+                  const erroredDocuments = [];
+                  bulkResponse.items.forEach((action, i) => {
+                      const operation = Object.keys(action)[0];
+                      if (action[operation].error) {
+                          erroredDocuments.push({
+                              status: action[operation].status,
+                              error: action[operation].error,
+                              document: bulkOperations[i * 2 + 1] // O documento correspondente
+                          });
+                      }
+                  });
+                  console.error('Erros na indexação em lote:', erroredDocuments);
+              }
+
+              const successfulDocs = bulkResponse.items.filter(item => {
+                  const operation = Object.keys(item)[0];
+                  return !item[operation].error;
+              }).length;
+
+              console.log(`${successfulDocs}/${allSplits.length} questões foram indexadas com sucesso no Elasticsearch!`);
+              return { success: successfulDocs, total: allSplits.length, errors: bulkResponse.errors };
+          } else {
+              throw new Error('Nenhuma questão válida para indexar');
+          }
+
+      } catch (error) {
+          console.error('Erro na função indexQuestoesElastic:', error);
+          throw error;
+      }
+    }
+
+    async function indexFlashcardsElastic(allSplits, id_law, id_art, list_arts, id_origin_law, disciplina, banca, es) {
+          try {
+              // Validar se há flashcards para indexar
+              if (!allSplits || !Array.isArray(allSplits) || allSplits.length === 0) {
+                  throw new Error('Nenhum flashcard válido para indexar');
+              }
+
+              // Validar estrutura de cada flashcard
+              const validFlashcards = allSplits.filter((flashcard, index) => {
+                  if (!flashcard.pergunta || !flashcard.resposta || !flashcard.nivel) {
+                      console.warn(`Flashcard ${index + 1} com estrutura inválida, pulando...`);
+                      return false;
+                  }
+                  return true;
+              });
+
+              if (validFlashcards.length === 0) {
+                  throw new Error('Nenhum flashcard com estrutura válida encontrado');
+              }
+
+              // Calcular nível de dificuldade geral do conjunto
+              const nivelCounts = validFlashcards.reduce((acc, card) => {
+                  acc[card.nivel] = (acc[card.nivel] || 0) + 1;
+                  return acc;
+              }, {});
+
+              const overallDifficulty = Object.keys(nivelCounts).reduce((a, b) => 
+                  nivelCounts[a] > nivelCounts[b] ? a : b
+              );
+
+              // Criar documento único com array nested
+              const doc = {
+                  title: `Artigo ${id_art} - ${disciplina?.name_disciplina || 'Direito'}`,
+                  flashcards: validFlashcards, // Array nested com todos os flashcards
+                  typeGuide: 'laws_flashcards', // corrigir typo
+                  icon: "mdi-card-text-outline",
+                  disciplina: disciplina?.name_disciplina || 'Não especificada',
+                  conteudo: `Flashcards do artigo ${id_art}`,
+                  data_include: formatDate(),
+                  id_origin_law: id_origin_law || null,
+                  id_law: id_law || null,
+                  id_art: id_art || null,
+                  list_arts: list_arts || [],
+                  created_by: 'admin',
+                  id_disciplina: disciplina?.id_disciplina || null,
+                  status: 'ativo',
+                  difficulty_level: overallDifficulty, // dificuldade geral do conjunto
+                  source_type: 'ai_generated',
+                  version: '1.0',
+                  banca: banca || 'GERADA POR IA',
+                  // Campos específicos para o conjunto
+                  total_flashcards: validFlashcards.length
+              };
+
+              // Indexar documento único
+              const resp = await es.index({
+                  index: 'guia_estudo',
+                  body: doc,
+                  refresh: true // Disponibilizar imediatamente
+              });
+
+              if (resp && resp.result) {
+                  console.log(`Guia de flashcards indexado com sucesso! ID: ${resp._id}`);
+                  return { 
+                      success: true, 
+                      total: validFlashcards.length, 
+                      elasticId: resp._id,
+                      index: resp._index,
+                      result: resp.result 
+                  };
+              } else {
+                  throw new Error('Falha na indexação do documento no Elasticsearch');
+              }
+
+          } catch (error) {
+              console.error('Erro na função indexFlashcardsElastic:', error);
+              throw error;
+          }
+      }
+
 
 export default function createForumRouter({ openai, es }) {
     const router = Router();
@@ -903,6 +1202,275 @@ export default function createForumRouter({ openai, es }) {
             res.status(500).json({
                 error: 'Erro interno do servidor',
                 message: 'Ocorreu um erro ao processar sua pergunta. Tente novamente.'
+            });
+        }
+    });
+
+    router.post('/gerarQuestoesFlahscards', validateApiKey, async (req, res) => {
+        const { pergunta, banca, contexto, artigo, legislacao, disciplina } = req.body;
+        
+        // Validações de entrada
+        if (!artigo?.numero || !legislacao?.nome || !pergunta || !artigo.texto) {
+            return res.status(400).json({ 
+                error: 'Campos obrigatórios: artigo.numero, legislacao.nome, pergunta e contexto.' 
+            });
+        }
+        
+        if (artigo.texto && artigo.texto.length > 50000) {
+            return res.status(400).json({
+                error: 'Texto muito longo',
+                message: 'O texto do artigo deve ter no máximo 50.000 caracteres'
+            });
+        }
+
+        try {
+            let prompt = '';
+            
+            if (pergunta === 'questoes') {
+                // Prompt para questões de certo/errado
+                prompt = `
+                  Você é um especialista em concursos públicos e elaboração de questões jurídicas no estilo CESPE/CEBRASPE.
+
+                  DADOS DO ARTIGO:
+                  - Disciplina: ${disciplina?.name_disciplina || 'Não especificada'}
+                  - Legislação: ${legislacao.nome}
+                  - Artigo: ${artigo.numero}
+                  - Texto: ${artigo.texto}
+                  - Contexto adicional: ${banca ? `- Banca: ${banca}` : ''}
+
+                  INSTRUÇÕES ESPECÍFICAS PARA ${disciplina?.name_disciplina?.toUpperCase() || 'DIREITO'}:
+                  1. Crie questões de CERTO/ERRADO baseadas no conteúdo fornecido
+                  2. Foque especificamente em ${disciplina?.name_disciplina || 'direito geral'}
+                  3. Simule o estilo das bancas CESPE, FCC, FGV, VUNESP
+                  4. Quantidade proporcional ao tamanho e complexidade do texto (mínimo 5, máximo 20)
+                  5. Inclua conhecimentos relacionados da área de ${disciplina?.name_disciplina || 'direito'} quando relevante
+                  6. Use jurisprudência, doutrina e outras legislações específicas de ${disciplina?.name_disciplina || 'direito'} 
+                  7. NÃO mencione números de artigos ou dispositivos nas perguntas
+                  8. Evite perguntas óbvias ou muito simples
+                  9. Varie a dificuldade das questões
+                  10. Contextualize com temas frequentes em concursos de ${disciplina?.name_disciplina || 'direito'}
+
+                  FORMATO DE SAÍDA:
+                  Retorne EXCLUSIVAMENTE um array JSON válido no formato:
+                  [
+                      {
+                          "pergunta": "texto da pergunta",
+                          "resposta": "verdadeiro ou falso",
+                          "justificativa": "justificativa detalhada com base no contexto indicando o dispositivo e jurisprudencia ou outras legislações se houver"
+                      }
+                  ]
+
+                  EXEMPLOS DE ESTILO:
+                  - "É possível que..." 
+                  - "Constitui hipótese de..."
+                  - "Segundo a legislação..."
+                  - "É correto afirmar que..."
+                  - "A respeito do tema..."
+
+                  Gere as questões:`;
+
+            } else if (pergunta === 'flashcards') {
+                              // Prompt para flashcards
+                              prompt = `
+                  Você é um especialista em educação jurídica e criação de flashcards para estudo.
+
+                  DADOS DO ARTIGO:
+                  - Disciplina: ${disciplina?.name_disciplina || 'Não especificada'}
+                  - Legislação: ${legislacao.nome}
+                  - Artigo: ${artigo.numero}
+                  - Texto: ${artigo.texto}
+                  - Contexto adicional: ${banca ? `- Banca: ${banca}` : ''}
+
+                  INSTRUÇÕES ESPECÍFICAS PARA ${disciplina?.name_disciplina?.toUpperCase() || 'DIREITO'}:
+                  1. Crie flashcards educativos baseados no conteúdo fornecido
+                  2. Foque especificamente em ${disciplina?.name_disciplina || 'direito geral'}
+                  3. Quantidade proporcional ao tamanho e complexidade do texto (mínimo 5, máximo 15)
+                  4. Varie os níveis de dificuldade: facil, medio, dificil
+                  5. Inclua conhecimentos complementares da área de ${disciplina?.name_disciplina || 'direito'}
+                  6. Use casos práticos, jurisprudência e doutrina específica de ${disciplina?.name_disciplina || 'direito'}
+                  7. NÃO mencione números de artigos ou dispositivos nas perguntas
+                  8. Foque em conceitos, aplicações práticas e entendimento específico da disciplina
+                  9. Relacione com temas cobrados em concursos e OAB na área de ${disciplina?.name_disciplina || 'direito'}
+
+                  FORMATO DE SAÍDA:
+                  Retorne EXCLUSIVAMENTE um array JSON válido no formato:
+                  [
+                      {
+                          "pergunta": "texto da pergunta",
+                          "resposta": "resposta completa e didática com justificativa",
+                          "nivel": "facil, medio ou dificil (sem acentos)"
+                      }
+                  ]
+
+                  CRITÉRIOS DE NÍVEL:
+                  - facil: conceitos básicos, definições simples
+                  - medio: aplicações práticas, relações entre conceitos
+                  - dificil: casos complexos, interpretações avançadas, exceções
+
+                  Gere os flashcards:
+                `;
+            } else {
+                return res.status(400).json({
+                    error: 'Tipo de pergunta inválido',
+                    message: 'Use "questoes" para questões de certo/errado ou "flashcards" para flashcards'
+                });
+            }
+
+            // Chamar a API da Anthropic
+            const anthropicResponse = await callAnthropicAPI(prompt);
+            
+            // Processar a resposta
+            let processedResponse;
+            try {
+                // Tentar extrair JSON da resposta
+                let jsonContent = anthropicResponse.content[0].text;
+                
+                // Limpar possíveis caracteres extras antes e depois do JSON
+                jsonContent = jsonContent.trim();
+                
+                // Extrair apenas o conteúdo entre colchetes se houver texto extra
+                const jsonMatch = jsonContent.match(/\[[\s\S]*\]/);
+                if (jsonMatch) {
+                    jsonContent = jsonMatch[0];
+                }
+                
+                // Parsear JSON
+                const parsedData = JSON.parse(jsonContent);
+                
+                // Validar estrutura
+                if (!Array.isArray(parsedData)) {
+                    throw new Error('Resposta deve ser um array');
+                }
+                
+                // Validar cada item do array
+                parsedData.forEach((item, index) => {
+                    if (pergunta === 'questoes') {
+                        if (!item.pergunta || !item.resposta || !item.justificativa) {
+                            throw new Error(`Item ${index + 1} não possui estrutura válida para questões`);
+                        }
+                        if (!['verdadeiro', 'falso'].includes(item.resposta.toLowerCase())) {
+                            throw new Error(`Item ${index + 1}: resposta deve ser 'verdadeiro' ou 'falso'`);
+                        }
+                    } else if (pergunta === 'flashcards') {
+                        if (!item.pergunta || !item.resposta || !item.nivel) {
+                            throw new Error(`Item ${index + 1} não possui estrutura válida para flashcards`);
+                        }
+                        if (!['facil', 'medio', 'dificil'].includes(item.nivel.toLowerCase())) {
+                            throw new Error(`Item ${index + 1}: nível deve ser 'facil', 'medio' ou 'dificil'`);
+                        }
+                    }
+                });
+                
+                processedResponse = {
+                    resposta: parsedData,
+                    suggestions: generateSuggestions(legislacao.nome, artigo.numero, disciplina?.name_disciplina),
+                    relatedTopics: generateRelatedTopics(contexto.textoArtigo, legislacao.nome, disciplina?.name_disciplina)
+                };
+                
+            } catch (parseError) {
+                console.error('Erro ao processar resposta da IA:', parseError);
+                return res.status(500).json({
+                    error: 'Erro ao processar resposta',
+                    message: 'A IA não retornou um formato válido. Tente novamente.'
+                });
+            }
+          if (pergunta === 'questoes'){
+            try {
+              await indexQuestoesElastic(
+                processedResponse.resposta, 
+                legislacao.group, 
+                legislacao.art, 
+                legislacao.arts, 
+                legislacao.id, 
+                disciplina?.id_disciplina, 
+                banca || null,  
+                es
+              );
+              console.log('questoes indexadas');
+
+            } catch (error) {
+              console.error('Erro ao indexar questões no Elasticsearch:', error);
+            }
+          } else if (pergunta === 'flashcards') {
+            try {
+                const resp = await indexFlashcardsElastic(
+                  processedResponse.resposta,
+                  legislacao.group, 
+                  legislacao.art, 
+                  legislacao.arts, 
+                  legislacao.id, 
+                  disciplina, 
+                  banca || null,
+                  es
+               );
+               console.log('flashcards indexados', resp);
+            } catch (error) {
+              console.error('Erro ao indexar flashcards no Elasticsearch:', error);
+            }
+
+          } else {
+            console.log('error nao gravas no elastic');
+          }
+            
+          // Resposta de sucesso
+          res.status(200).json({
+                success: true,
+                data: {
+                    resposta: processedResponse.resposta,
+                    typeresposta: 'questoesflashcards',
+                    metadata: {
+                        disciplina: disciplina?.name_disciplina || 'Não especificada',
+                        legislacao: legislacao.nome,
+                        artigo: artigo.numero,
+                        banca: banca || 'Não especificada',
+                        tipo: pergunta,
+                        totalItens: processedResponse.resposta.length,
+                        processedAt: new Date().toISOString(),
+                        tokensUsed: anthropicResponse.usage?.input_tokens + anthropicResponse.usage?.output_tokens || 0
+                    },
+                    suggestions: processedResponse.suggestions || [],
+                    relatedTopics: processedResponse.relatedTopics || []
+                }
+          });
+
+        } catch (error) {
+            console.error('Erro ao processar pergunta jurídica:', {
+                error: error.message,
+                stack: error.stack,
+                disciplina: disciplina?.name_disciplina || 'Não especificada',
+                legislacao: legislacao.nome,
+                artigo: artigo.numero
+            });
+
+            // Tratamento específico de erores
+            if (error.code === 'ECONNREFUSED') {
+                return res.status(503).json({
+                    error: 'Serviço temporariamente indisponível',
+                    message: 'Erro de conexão com a API. Tente novamente em alguns minutos.'
+                });
+            }
+
+            if (error.status === 429) {
+                return res.status(429).json({
+                    error: 'Limite de requisições excedido',
+                    message: 'Muitas requisições. Aguarde alguns segundos antes de tentar novamente.',
+                    retryAfter: error.headers?.['retry-after'] || 60
+                });
+            }
+
+            if (error.status === 400) {
+                return res.status(400).json({
+                    error: 'Requisição inválida',
+                    message: 'Verifique os dados enviados e tente novamente.',
+                    details: error.message
+                });
+            }
+
+            // Erro genérico
+            res.status(500).json({
+                error: 'Erro interno do servidor',
+                message: 'Ocorreu um erro ao processar sua pergunta. Tente novamente.',
+                errorId: `ERR_${Date.now()}`
             });
         }
     });
