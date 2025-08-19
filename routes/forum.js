@@ -1578,6 +1578,7 @@ export default function createForumRouter({ openai, es }) {
                   6. Todos os campos exigidos devem ser preenchidos.
                   7. Pode haver mais níveis, dependendo da complexidade (children) do texto
                   8. Siga a estrutura da biblioteca vue3-mindmap que ira renderizar no front
+                  9. inclua Emoji para serem exibidos quando relacionado com o texto, para facilitar a memorização
 
                   EXEMPLO DE FORMATO DE SAÍDA:
                   Retorne EXCLUSIVAMENTE um array JSON válido no formato:
