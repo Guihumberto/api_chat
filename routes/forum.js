@@ -752,7 +752,73 @@ dotenv.config();
               console.error('Erro na função indexFlashcardsElastic:', error);
               throw error;
           }
-      }
+    }
+
+    async function indexMindMapElastic(allSplits, id_law, id_art, list_arts, id_origin_law, disciplina, banca, es) {
+          try {
+              // Validar se há flashcards para indexar
+              if (!allSplits || !Array.isArray(allSplits) || allSplits.length === 0) {
+                  throw new Error('Nenhum mapmind válido para indexar');
+              }
+
+              // Validar estrutura de cada flashcard
+              const validMapMind = allSplits.filter((mapmind, index) => {
+                  if (!mapmind.name || !mapmind.children.length) {
+                      console.warn(`MindMap ${index + 1} com estrutura inválida, pulando...`);
+                      return false;
+                  }
+                  return true;
+              });
+
+              if (validMapMind.length === 0) {
+                  throw new Error('Nenhum mapmind com estrutura válida encontrado');
+              }
+
+
+              // Criar documento único com array nested
+              const doc = {
+                  title: `Artigo ${id_art} - ${disciplina?.name_disciplina || 'Direito'}`,
+                  children: validMapMind, // Array nested com todos os flashcards
+                  typeGuide: 'laws_mapmind', // corrigir typo
+                  disciplina: disciplina?.name_disciplina || 'Não especificada',
+                  subtitle: `Mapa mental do artigo ${id_art}`,
+                  data_include: formatDate(),
+                  id: id_origin_law || null,
+                  id_group: id_law || null,
+                  art: id_art || null,
+                  list_arts: list_arts || [],
+                  created_by: 'admin',
+                  id_disciplina: disciplina?.id_disciplina || null,
+                  status: 'ativo',
+                  source_type: 'ai_generated',
+                  version: '1.0',
+                  banca: banca || 'GERADA POR IA',
+              };
+
+              // Indexar documento único
+              const resp = await es.index({
+                  index: 'mind_maps',
+                  body: doc,
+                  refresh: true // Disponibilizar imediatamente
+              });
+
+              if (resp && resp.result) {
+                  console.log(`Guia de MndMap indexado com sucesso! ID: ${resp._id}`);
+                  return { 
+                      success: true, 
+                      elasticId: resp._id,
+                      index: resp._index,
+                      result: resp.result 
+                  };
+              } else {
+                  throw new Error('Falha na indexação do documento no Elasticsearch');
+              }
+
+          } catch (error) {
+              console.error('Erro na função indexMindMapElastic:', error);
+              throw error;
+          }
+    }
 
 
 export default function createForumRouter({ openai, es }) {
@@ -1418,6 +1484,228 @@ export default function createForumRouter({ openai, es }) {
                 data: {
                     resposta: processedResponse.resposta,
                     typeresposta: 'questoesflashcards',
+                    metadata: {
+                        disciplina: disciplina?.name_disciplina || 'Não especificada',
+                        legislacao: legislacao.nome,
+                        artigo: artigo.numero,
+                        banca: banca || 'Não especificada',
+                        tipo: pergunta,
+                        totalItens: processedResponse.resposta.length,
+                        processedAt: new Date().toISOString(),
+                        tokensUsed: anthropicResponse.usage?.input_tokens + anthropicResponse.usage?.output_tokens || 0
+                    },
+                    suggestions: processedResponse.suggestions || [],
+                    relatedTopics: processedResponse.relatedTopics || []
+                }
+          });
+
+        } catch (error) {
+            console.error('Erro ao processar pergunta jurídica:', {
+                error: error.message,
+                stack: error.stack,
+                disciplina: disciplina?.name_disciplina || 'Não especificada',
+                legislacao: legislacao.nome,
+                artigo: artigo.numero
+            });
+
+            // Tratamento específico de erores
+            if (error.code === 'ECONNREFUSED') {
+                return res.status(503).json({
+                    error: 'Serviço temporariamente indisponível',
+                    message: 'Erro de conexão com a API. Tente novamente em alguns minutos.'
+                });
+            }
+
+            if (error.status === 429) {
+                return res.status(429).json({
+                    error: 'Limite de requisições excedido',
+                    message: 'Muitas requisições. Aguarde alguns segundos antes de tentar novamente.',
+                    retryAfter: error.headers?.['retry-after'] || 60
+                });
+            }
+
+            if (error.status === 400) {
+                return res.status(400).json({
+                    error: 'Requisição inválida',
+                    message: 'Verifique os dados enviados e tente novamente.',
+                    details: error.message
+                });
+            }
+
+            // Erro genérico
+            res.status(500).json({
+                error: 'Erro interno do servidor',
+                message: 'Ocorreu um erro ao processar sua pergunta. Tente novamente.',
+                errorId: `ERR_${Date.now()}`
+            });
+        }
+    });
+
+    router.post('/gerarMindMap', validateApiKey, async (req, res) => {
+        const { pergunta, banca, contexto, artigo, legislacao, disciplina } = req.body;
+        
+        // Validações de entrada
+        if (!artigo?.numero || !legislacao?.nome || !pergunta || !artigo.texto) {
+            return res.status(400).json({ 
+                error: 'Campos obrigatórios: artigo.numero, legislacao.nome, pergunta e contexto.' 
+            });
+        }
+        
+        if (artigo.texto && artigo.texto.length > 50000) {
+            return res.status(400).json({
+                error: 'Texto muito longo',
+                message: 'O texto do artigo deve ter no máximo 50.000 caracteres'
+            });
+        }
+
+        try {
+                let prompt = `
+                  Você é um especialista em concursos públicos especializado em transformar textos legais em mapas mentais estruturados.
+
+                  DADOS DO ARTIGO:
+                  - Disciplina: ${disciplina?.name_disciplina || 'Não especificada'}
+                  - Legislação: ${legislacao.nome}
+                  - Artigo: ${artigo.numero}
+                  - Texto: ${artigo.texto}
+                  - Contexto adicional: ${banca ? `- Banca: ${banca}` : ''}
+
+                  INSTRUÇÕES ESPECÍFICAS PARA ${disciplina?.name_disciplina?.toUpperCase() || 'DIREITO'}:
+                  1. Foque especificamente em ${disciplina?.name_disciplina || 'direito geral'}
+                  2. Inclua conhecimentos relacionados da área de ${disciplina?.name_disciplina || 'direito'} quando relevante
+                  3. Use jurisprudência, doutrina e outras legislações específicas de ${disciplina?.name_disciplina || 'direito'} 
+                  4. Contextualize com temas frequentes em concursos de ${disciplina?.name_disciplina || 'direito'}
+                  5. Respeite os níveis hierárquicos e use os tipos conforme o modelo
+                  6. Todos os campos exigidos devem ser preenchidos.
+                  7. Pode haver mais níveis, dependendo da complexidade (children) do texto
+                  8. Siga a estrutura da biblioteca vue3-mindmap que ira renderizar no front
+
+                  EXEMPLO DE FORMATO DE SAÍDA:
+                  Retorne EXCLUSIVAMENTE um array JSON válido no formato:
+                  [
+                    {
+                        "name": " How to learn D3 ",
+                        "children": [
+                        {
+                            "name": " preliminary knowledge ",
+                            "children": [
+                                { "name": "HTML & CSS" },
+                                { "name": "JavaScript" },
+                                { "name": "DOM" },
+                                { "name": "SVG" },
+                                { "name": "test\ntest" }
+                            ]
+                        },
+                        {
+                            "name": " installation ",
+                            "collapse": true,
+                            "children": [{ "name": " folded node " }]
+                        },
+                        {
+                            "name": " Getting Started ",
+                            "children": [
+                            { "name": " selection " },
+                            { "name": "test" },
+                            { "name": " Binding Data " },
+                            { "name": " Add and remove elements " },
+                            {
+                                "name": " Simple Graphics ",
+                                "children": [
+                                { "name": " Histogram " },
+                                { "name": " line chart " },
+                                { "name": " scatterplot " }
+                                ]
+                            },
+                            { "name": " scale " },
+                            { "name": " Generator " },
+                            { "name": " transition " }
+                            ],
+                            "left": true
+                        },
+                        {
+                            "name": " Advanced ",
+                            "left": true
+                        },
+                        {
+                            "name": " level one node ",
+                            "children": [
+                            { "name": " child node 1 " },
+                            { "name": " child node 2 " },
+                            { "name": " child node 3 " }
+                            ]
+                        }
+                        ]
+                    }
+                 ]
+ 
+                  Gere o mapa mental:`;
+
+
+            // Chamar a API da Anthropic
+            const anthropicResponse = await callAnthropicAPI(prompt);
+            
+            // Processar a resposta
+            let processedResponse;
+            try {
+                // Tentar extrair JSON da resposta
+                let jsonContent = anthropicResponse.content[0].text;
+                
+                // Limpar possíveis caracteres extras antes e depois do JSON
+                jsonContent = jsonContent.trim();
+                
+                // Extrair apenas o conteúdo entre colchetes se houver texto extra
+                const jsonMatch = jsonContent.match(/\[[\s\S]*\]/);
+                if (jsonMatch) {
+                    jsonContent = jsonMatch[0];
+                }
+                
+                // Parsear JSON
+                const parsedData = JSON.parse(jsonContent);
+                
+                // Validar estrutura
+                if (!Array.isArray(parsedData)) {
+                    throw new Error('Resposta deve ser um array');
+                }
+                
+        
+                
+                processedResponse = {
+                    resposta: parsedData,
+                    suggestions: generateSuggestions(legislacao.nome, artigo.numero, disciplina?.name_disciplina),
+                    relatedTopics: generateRelatedTopics(contexto.textoArtigo, legislacao.nome, disciplina?.name_disciplina)
+                };
+                
+            } catch (parseError) {
+                console.error('Erro ao processar resposta da IA:', parseError);
+                return res.status(500).json({
+                    error: 'Erro ao processar resposta',
+                    message: 'A IA não retornou um formato válido. Tente novamente.'
+                });
+            }
+            
+
+            try {
+              await indexMindMapElastic(
+                processedResponse.resposta,
+                legislacao.group, 
+                legislacao.art, 
+                legislacao.arts, 
+                legislacao.id, 
+                disciplina, 
+                banca || null,
+                es
+              );
+              console.log('mindmpa indexadas');
+
+            } catch (error) {
+              console.error('Erro ao indexar questões no Elasticsearch:', error);
+            }
+            
+          // Resposta de sucesso
+          res.status(200).json({
+                success: true,
+                data: {
+                    resposta: processedResponse.resposta,
+                    typeresposta: 'mindmap',
                     metadata: {
                         disciplina: disciplina?.name_disciplina || 'Não especificada',
                         legislacao: legislacao.nome,
