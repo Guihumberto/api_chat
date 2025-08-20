@@ -820,6 +820,56 @@ dotenv.config();
           }
     }
 
+    async function indexNotasElastic(id_origin_law, id_law, list_arts, explicacao, disciplina, banca, area, cargo, es) {
+          try {
+              // Validar se há flashcards para indexar
+              if (!list_arts || !Array.isArray(list_arts) || list_arts.length === 0) {
+                  throw new Error('Nenhuma lista artigo válido para indexar');
+              }
+
+              // Criar documento
+              const doc = {
+                  id_law: id_origin_law || null,
+                  id_group: id_law || null,
+                  list_arts: list_arts || [],
+                  texto: explicacao,
+                  banca: banca || 'Principais',
+                  area: area || 'Principais',
+                  cargo: cargo || 'Principais',
+                  disciplina: disciplina || 'Direito',
+                  typeGuide: 'analise_law',
+                  created_by: 'admin',
+                  data_include: formatDate(),
+                  status: 'ativo',
+                  source_type: 'ai_generated',
+                  version: '1.0',
+              };
+
+              // Indexar documento único
+              const resp = await es.index({
+                  index: 'notas_law',
+                  body: doc,
+                  refresh: true // Disponibilizar imediatamente
+              });
+
+              if (resp && resp.result) {
+                  console.log(`Notas da Lei indexado com sucesso! ID: ${resp._id}`);
+                  return { 
+                      success: true, 
+                      elasticId: resp._id,
+                      index: resp._index,
+                      result: resp.result 
+                  };
+              } else {
+                  throw new Error('Falha na indexação do documento no Elasticsearch');
+              }
+
+          } catch (error) {
+              console.error('Erro na função indexNotasElastic:', error);
+              throw error;
+          }
+    }
+
 
 export default function createForumRouter({ openai, es }) {
     const router = Router();
@@ -1483,7 +1533,7 @@ export default function createForumRouter({ openai, es }) {
                 success: true,
                 data: {
                     resposta: processedResponse.resposta,
-                    typeresposta: 'questoesflashcards',
+                    typeresposta: pergunta,
                     metadata: {
                         disciplina: disciplina?.name_disciplina || 'Não especificada',
                         legislacao: legislacao.nome,
@@ -1764,16 +1814,315 @@ export default function createForumRouter({ openai, es }) {
         }
     });
 
-    // router.post('/analise-juridica', async (req, res) => {
-    //   const sistema = new SistemaMultiagenteJuridico(process.env.ANTHROPIC_API_KEY);
-      
-    //   try {
-    //     const resultado = await sistema.gerarAnaliseJuridica(req.body);
-    //     res.json(resultado);
-    //   } catch (error) {
-    //     res.status(500).json({ erro: error.message });
-    //   }
-    // });
+    router.post('/resumir', validateApiKey, async (req, res) => {
+        const { texto, legislacao = null, orientacao = null } = req.body;
+
+        if (!texto) {
+            return res.status(400).json({ 
+                error: 'Campo obrigatório: texto do resumo.' 
+            });
+        }
+
+        if (texto && texto.length > 50000) {
+            return res.status(400).json({
+                error: 'Texto muito longo',
+                message: 'O texto do artigo deve ter no máximo 50.000 caracteres'
+            });
+        }
+
+        try {
+              const prompt = `
+                Você é um especialista em Direito com foco em concursos públicos e OAB. Analise o seguinte artigo jurídico e forneça um resumo completo seguindo as instruções:
+
+                ${legislacao ? `**LEGISLAÇÃO:** ${legislacao}` : ''}
+                ${orientacao ? `**ORIENTAÇÃO ESPECIAL:** ${orientacao}` : ''}
+
+                **TEXTO DO ARTIGO:**
+                ${texto}
+
+                **INSTRUÇÕES:**
+                1. Retorne APENAS código HTML bem formatado (sem tags html, head ou body)
+                2. Inicie com uma síntese breve do que trata o artigo
+                3. Faça um resumo focado em concursos públicos e OAB
+                4. Use cores para destacar elementos importantes (mas mantenha tamanho padrão)
+                5. Use emojis moderadamente para tornar a leitura agradável
+                6. Explique conceitos jurídicos importantes que apareçam no texto
+                7. Caso o  artigo ou algum dos seus dispositivos tenha sido revogado ou anulado informe e fundamente
+                8. entre uma seção e outra dê quebras de linha com a tag <br>
+                9. Crie uma seção "Aprofundando" com:
+                - Dispositivos correlatos da mesma lei ou outras normas
+                - Jurisprudência do STF/STJ (se relevante)
+                - Doutrina relevante
+
+                **FORMATO HTML DESEJADO:**
+                - Use <div>, <p>, <h3>, <h4>, <strong>, <em>
+                - Use cores como: <span style="color: #d32f2f"> para alertas, <span style="color: #1976d2"> para conceitos, <span style="color: #388e3c"> para jurisprudência
+                - Estruture bem o conteúdo com divisões claras
+                - Mantenha profissionalismo mesmo com emojis
+
+                Foque em aspectos práticos para concursos e OAB, destacando pontos que costumam ser cobrados em provas ou como podem ser abordados.`;
+
+            const anthropicResponse = await callAnthropicAPI(prompt);
+
+            if (!anthropicResponse || !anthropicResponse.content || !anthropicResponse.content[0]) {
+                return res.status(500).json({
+                    error: 'Erro na resposta da IA',
+                    message: 'A IA não retornou uma resposta válida'
+                });
+            }
+
+            const resumoHTML = anthropicResponse.content[0].text;
+
+            // Validação básica do HTML retornado
+            if (!resumoHTML || resumoHTML.trim().length === 0) {
+                return res.status(500).json({
+                    error: 'Resumo vazio',
+                    message: 'A IA retornou um resumo vazio'
+                });
+            }
+
+            // Resposta de sucesso
+            res.status(200).json({
+                success: true,
+                data: {
+                    resumo: resumoHTML,
+                    legislacao: legislacao,
+                    orientacao: orientacao,
+                    caracteres_originais: texto.length,
+                    timestamp: new Date().toISOString()
+                }
+            });
+
+        } catch (error) {
+            console.error('Erro ao processar resumo:', error);
+            
+            // Tratamento de diferentes tipos de erro
+            if (error.response) {
+                // Erro da API da Anthropic
+                return res.status(error.response.status || 500).json({
+                    error: 'Erro na API da Anthropic',
+                    message: error.response.data?.error?.message || 'Erro desconhecido na IA',
+                    details: error.response.status === 429 ? 'Limite de taxa excedido. Tente novamente em alguns minutos.' : null
+                });
+            } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+                // Erro de conexão
+                return res.status(503).json({
+                    error: 'Erro de conexão',
+                    message: 'Não foi possível conectar com a API da Anthropic'
+                });
+            } else {
+                // Erro genérico
+                return res.status(500).json({
+                    error: 'Erro interno do servidor',
+                    message: 'Erro inesperado ao processar o resumo'
+                });
+            }
+        }
+    });
+
+    router.post('/artigos-importantes', validateApiKey, async (req, res) => {
+        const { lei, banca = null, disciplina = null, area = null, cargo = null, id_origin_law = null, id_law = null } = req.body;
+
+        if (!lei) {
+            return res.status(400).json({ 
+                error: 'Campo obrigatório: nome da lei.' 
+            });
+        }
+
+        if (lei && lei.length > 200) {
+            return res.status(400).json({
+                error: 'Nome da lei muito longo',
+                message: 'O nome da lei deve ter no máximo 200 caracteres'
+            });
+        }
+
+        try {
+            console.log('entrou 1');
+            // Prompt melhorado para garantir resposta em JSON
+            const prompt = `
+                Você é um especialista em concursos públicos e OAB. Analise a legislação e retorne APENAS um JSON válido sem texto adicional.
+
+                **LEGISLAÇÃO:** ${lei}
+                **BANCA:** ${banca || 'Todas as principais (CESPE/CEBRASPE, FCC, VUNESP, FGV, etc.)'}
+                **DISCIPLINA:** ${disciplina || 'Multidisciplinar'}
+                **ÁREA:** ${area || 'Todas as principais'}
+                **CARGO:** ${cargo || 'Todos os principais'}
+
+                **IMPORTANTE:** Retorne APENAS o JSON abaixo, sem texto antes ou depois:
+
+                {
+                "artigos_importantes": [1, 2, 5, 10, 15],
+                "explicacao_html": "<div><h3>📊 Artigos Mais Cobrados - Regra de Pareto</h3><p>Com base na análise dos últimos 5 anos de concursos...</p><h4>🎯 Art. 1 - [Tema]</h4><p><strong>Frequência:</strong> Muito Alta | <strong>Dificuldade:</strong> [Nível]</p><p>[Explicação do artigo...]</p><p><span style='color: #1976d2'><strong>Conexões:</strong></span> [outros artigos...]</p><p><span style='color: #388e3c'><strong>Jurisprudência:</strong></span> [STF/STJ...]</p><p><span style='color: #f57c00'><strong>Doutrina:</strong></span> [autores...]</p><p><span style='color: #d32f2f'><strong>⚠️ Pegadinhas:</strong></span> [cuidados...]</p><br></div>",
+                "banca_analisada": "${banca || 'Todas as principais'}",
+                "disciplina_analisada": "${disciplina || 'Multidisciplinar'}",
+                "area_analisada": "${area || 'Todas as principais'}",
+                "cargo_analisado": "${cargo || 'Todos os principais'}",
+                "total_artigos_identificados": 5
+                }
+
+                INSTRUÇÕES PARA O HTML:
+                - Use aspas simples (') dentro do HTML
+                - Para cada artigo importante: frequência, dificuldade, explicação, conexões, jurisprudência (referencia e texto), doutrina (referencia e texto) e pegadinhas
+                - Use cores: #d32f2f (alertas), #1976d2 (conceitos), #388e3c (jurisprudência), #f57c00 (doutrina)
+                - Use <br> entre seções de artigos
+                - Emojis moderados (2-3 por seção)
+                - Se artigo tiver letra (ex: 156-C), coloque apenas o número no array e explique a letra no HTML
+
+                Aplique a regra de Pareto baseada nos últimos 5 anos de concursos.`;
+
+
+            const anthropicResponse = await callAnthropicAPI(prompt);
+
+            if (!anthropicResponse || !anthropicResponse.content || !anthropicResponse.content[0]) {
+                return res.status(500).json({
+                    error: 'Erro na resposta da IA',
+                    message: 'A IA não retornou uma resposta válida'
+                });
+            }
+
+            let responseText = anthropicResponse.content[0].text.trim();
+            console.log('Resposta da IA (primeiros 500 chars):', responseText.substring(0, 500));
+
+            // Lógica melhorada para extrair JSON
+            let parsedResponse;
+            try {
+                // Tentar parsear diretamente primeiro
+                parsedResponse = JSON.parse(responseText);
+            } catch (directParseError) {
+                console.log('Parse direto falhou, tentando extrair JSON...');
+                
+                try {
+                    // Procurar por JSON na resposta usando regex mais robusta
+                    const jsonRegexes = [
+                        /\{[\s\S]*?\}/g, // JSON básico
+                        /```json\s*(\{[\s\S]*?\})\s*```/g, // JSON em code block
+                        /```\s*(\{[\s\S]*?\})\s*```/g, // JSON em code block sem "json"
+                    ];
+
+                    let jsonFound = false;
+                    
+                    for (const regex of jsonRegexes) {
+                        const matches = [...responseText.matchAll(regex)];
+                        
+                        for (const match of matches) {
+                            try {
+                                const jsonStr = match[1] || match[0];
+                                parsedResponse = JSON.parse(jsonStr);
+                                jsonFound = true;
+                                console.log('JSON encontrado e parseado com sucesso');
+                                break;
+                            } catch (e) {
+                                continue;
+                            }
+                        }
+                        
+                        if (jsonFound) break;
+                    }
+
+                    if (!jsonFound) {
+                        throw new Error('Nenhum JSON válido encontrado na resposta');
+                    }
+                } catch (extractError) {
+                    console.log('Erro ao extrair JSON:', extractError.message);
+                    return res.status(500).json({
+                        error: 'Erro ao processar resposta',
+                        message: 'A IA não retornou um formato JSON válido',
+                        debug: {
+                            responseStart: responseText.substring(0, 300),
+                            responseEnd: responseText.substring(Math.max(0, responseText.length - 300)),
+                            parseError: extractError.message
+                        }
+                    });
+                }
+            }
+
+            console.log('entrou 5 - JSON parseado:', Object.keys(parsedResponse));
+
+            // Validação da estrutura da resposta
+            if (!parsedResponse.artigos_importantes || !Array.isArray(parsedResponse.artigos_importantes)) {
+                return res.status(500).json({
+                    error: 'Resposta inválida',
+                    message: 'Lista de artigos importantes não encontrada ou inválida',
+                    debug: parsedResponse
+                });
+            }
+
+            if (parsedResponse.artigos_importantes.length === 0) {
+                return res.status(500).json({
+                    error: 'Resposta inválida',
+                    message: 'Lista de artigos importantes está vazia'
+                });
+            }
+
+
+            if (!parsedResponse.explicacao_html || parsedResponse.explicacao_html.trim().length === 0) {
+                return res.status(500).json({
+                    error: 'Resposta inválida',
+                    message: 'Explicação HTML não encontrada ou vazia'
+                });
+            }
+
+            // Atualizar o total de artigos se não estiver correto
+            if (parsedResponse.total_artigos_identificados !== parsedResponse.artigos_importantes.length) {
+                parsedResponse.total_artigos_identificados = parsedResponse.artigos_importantes.length;
+            }
+
+            // Indexar no Elasticsearch se os IDs foram fornecidos
+            if (id_origin_law) {
+                try {
+                    await indexNotasElastic(id_origin_law, id_law, parsedResponse.artigos_importantes, parsedResponse.explicacao_html, disciplina, banca, area, cargo, es);
+                    console.log('Indexado no Elasticsearch com sucesso');
+                } catch (elasticError) {
+                    console.error('Erro ao indexar no Elasticsearch:', elasticError);
+                    // Não retornar erro aqui, apenas logar
+                }
+            }
+
+            // Resposta de sucesso
+            res.status(200).json({
+                success: true,
+                data: {
+                    lei: lei,
+                    banca_analisada: parsedResponse.banca_analisada || (banca || 'Todas as principais'),
+                    disciplina_analisada: parsedResponse.disciplina_analisada || (disciplina || 'Multidisciplinar'),
+                    area_analisada: parsedResponse.area_analisada || (area || 'Todas as principais'),
+                    cargo_analisado: parsedResponse.cargo_analisado || (cargo || 'Todos os principais'),
+                    artigos_importantes: parsedResponse.artigos_importantes,
+                    total_artigos_identificados: parsedResponse.artigos_importantes.length,
+                    explicacao_html: parsedResponse.explicacao_html,
+                    timestamp: new Date().toISOString(),
+                    analise_periodo: 'Últimos 5 anos (2019-2024)',
+                    typeresposta: 'analiselaw'
+                }
+            });
+
+        } catch (error) {
+            console.error('Erro ao processar análise de artigos:', error);
+            
+            // Tratamento de diferentes tipos de erro
+            if (error.response) {
+                // Erro da API da Anthropic
+                return res.status(error.response.status || 500).json({
+                    error: 'Erro na API da Anthropic',
+                    message: error.response.data?.error?.message || 'Erro desconhecido na IA',
+                    details: error.response.status === 429 ? 'Limite de taxa excedido. Tente novamente em alguns minutos.' : null
+                });
+            } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+                // Erro de conexão
+                return res.status(503).json({
+                    error: 'Erro de conexão',
+                    message: 'Não foi possível conectar com a API da Anthropic'
+                });
+            } else {
+                // Erro genérico
+                return res.status(500).json({
+                    error: 'Erro interno do servidor',
+                    message: 'Erro inesperado ao processar a análise de artigos',
+                    debug: error.message
+                });
+            }
+        }
+    });
 
   return router;
 }
