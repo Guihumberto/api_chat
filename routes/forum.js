@@ -1948,6 +1948,12 @@ export default function createForumRouter({ openai, es }) {
                 **ÁREA:** ${area || 'Todas as principais'}
                 **CARGO:** ${cargo || 'Todos os principais'}
 
+                instrucoes para a busca
+                1. faça as buscas em questoes reais dos ultimos 5 anos na banca informada
+                2. Cite um resumo das jurisprudencias e doutrina encontradas desde que ainda vigentes
+                3. as conexoes com legislacoes devem estar vigentes (nao revogadas ou anuladas)
+
+
                 **IMPORTANTE:** Retorne APENAS o JSON abaixo, sem texto antes ou depois:
 
                 {
@@ -1962,7 +1968,7 @@ export default function createForumRouter({ openai, es }) {
 
                 INSTRUÇÕES PARA O HTML:
                 - Use aspas simples (') dentro do HTML
-                - Para cada artigo importante: frequência, dificuldade, explicação, conexões, jurisprudência (referencia e texto), doutrina (referencia e texto) e pegadinhas
+                - Para cada artigo importante: frequência, dificuldade, explicação, conexões, cite as jurisprudência e a doutrina que já foram cobradas mencionado o texto e a referência e pegadinhas
                 - Use cores: #d32f2f (alertas), #1976d2 (conceitos), #388e3c (jurisprudência), #f57c00 (doutrina)
                 - Use <br> entre seções de artigos
                 - Emojis moderados (2-3 por seção)
