@@ -2583,6 +2583,7 @@ export default function createForumRouter({ openai, es }) {
                 "status": "pending",
                 "completedAt": null,
                 "createdAt": "2025-08-28T00:00:00.000Z"
+                "observacao": "Não foi possivel inserir nas tarefas os arts. pode nao haver tempo suficiente atribuido a legislacao"
                 }
                 \`\`\`
 
@@ -2590,6 +2591,9 @@ export default function createForumRouter({ openai, es }) {
 
                 **DURAÇÃO DAS TAREFAS:**
                 - Cada tarefa: 30 minutos a 1 hora máximo
+                - deve se considerar o tamanho texto dos artigos sugeridos e sua complexidade
+                - caso o usuario indique os artigos em listArts e o tempo nao seja exequivel, limite apenas o que seja viavel no tempo
+                - Justifique a questao do tempo nao exequivel no campo observação da ultima tarefa de cada legislacao, se for o caso.
                 - Incluir tempo para: leitura + flashcards + questões + mapas mentais
                 - Se legislação tem mais de 1h disponível, criar múltiplas tarefas
 
