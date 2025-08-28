@@ -1152,8 +1152,8 @@ dotenv.config();
                 refresh: true
             });
 
-            console.log('Documento indexado com sucesso:', response.result);
-            return { idU: resp.data.id, ...document };
+            console.log('Documento indexado com sucesso:', response);
+            return { idU: response._id, ...document };
 
         } catch (error) {
             console.error('Erro ao indexar no Elasticsearch:', error);
