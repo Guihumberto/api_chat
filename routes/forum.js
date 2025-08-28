@@ -2683,6 +2683,7 @@ export default function createForumRouter({ openai, es }) {
                 success: true,
                 data: {
                     tasks,
+                    plan: indexar,
                     planning: {
                         id: planning.id,
                         totalTasks: tasks.length,
