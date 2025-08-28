@@ -105,6 +105,216 @@ dotenv.config();
       }
     }
 
+    async function debugAnthropicAPI() {
+        try {
+            const testPrompt = "Responda apenas com um JSON válido: [{\"test\": true}]";
+            
+            console.log('🧪 Testando API Anthropic...');
+            console.log('Prompt de teste:', testPrompt);
+            
+            const response = await fetch('https://api.anthropic.com/v1/messages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': process.env.ANTHROPIC_API_KEY,
+                    'anthropic-version': '2023-06-01'
+                },
+                body: JSON.stringify({
+                    model: 'claude-3-5-sonnet-20241022',
+                    max_tokens: 1000,
+                    messages: [{
+                        role: 'user',
+                        content: testPrompt
+                    }]
+                })
+            });
+
+            console.log('Status da resposta:', response.status);
+            console.log('Headers da resposta:', Object.fromEntries(response.headers.entries()));
+
+            const data = await response.json();
+            console.log('Dados completos da resposta:', JSON.stringify(data, null, 2));
+
+            if (data.content && data.content[0] && data.content[0].text) {
+                console.log('✅ Texto extraído:', data.content[0].text);
+                console.log('✅ Tipo do texto:', typeof data.content[0].text);
+            } else {
+                console.log('❌ Estrutura inesperada na resposta');
+            }
+
+        } catch (error) {
+            console.error('❌ Erro no teste:', error);
+        }
+    }
+
+    async function callAnthropicAPIRobust(prompt) {
+        try {
+            console.log('🚀 Chamando API Anthropic...');
+            
+            const requestBody = {
+                model: 'claude-3-5-sonnet-20241022',
+                max_tokens: 4000,
+                messages: [{
+                    role: 'user',
+                    content: prompt
+                }]
+            };
+            
+            console.log('📤 Request body:', JSON.stringify(requestBody, null, 2));
+            
+            const response = await fetch('https://api.anthropic.com/v1/messages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': process.env.ANTHROPIC_API_KEY,
+                    'anthropic-version': '2023-06-01'
+                },
+                body: JSON.stringify(requestBody)
+            });
+
+            console.log('📥 Status da resposta:', response.status);
+            
+            // Ler a resposta como texto primeiro para debug
+            const responseText = await response.text();
+            console.log('📥 Resposta bruta (primeiros 500 chars):', responseText.substring(0, 500));
+
+            if (!response.ok) {
+                console.error('❌ Resposta não OK:', responseText);
+                throw new Error(`Erro na API Anthropic: ${response.status} - ${responseText}`);
+            }
+
+            // Parse do JSON
+            let data;
+            try {
+                data = JSON.parse(responseText);
+            } catch (jsonError) {
+                console.error('❌ Erro ao fazer parse do JSON:', jsonError);
+                console.error('Texto completo da resposta:', responseText);
+                throw new Error('Resposta da API não é um JSON válido');
+            }
+            
+            console.log('✅ Dados parseados:', JSON.stringify(data, null, 2));
+            
+            // Verificar estrutura da resposta
+            if (!data || typeof data !== 'object') {
+                throw new Error('Resposta da API não é um objeto válido');
+            }
+            
+            if (!data.content || !Array.isArray(data.content)) {
+                throw new Error('Campo "content" não encontrado ou não é array');
+            }
+            
+            if (data.content.length === 0) {
+                throw new Error('Array "content" está vazio');
+            }
+            
+            const content = data.content[0];
+            if (!content || typeof content !== 'object') {
+                throw new Error('Primeiro item do content não é válido');
+            }
+            
+            if (content.type !== 'text') {
+                throw new Error(`Tipo de conteúdo inesperado: ${content.type}`);
+            }
+            
+            if (typeof content.text !== 'string') {
+                throw new Error(`Campo "text" não é string: ${typeof content.text}`);
+            }
+            
+            console.log('✅ Texto extraído com sucesso:', content.text.substring(0, 200) + '...');
+            return content.text;
+            
+        } catch (error) {
+            console.error('❌ Erro na chamada da API Anthropic:', error);
+            
+            // Se for erro de rede ou API, tentamos um fallback
+            if (error.message.includes('fetch') || error.message.includes('network')) {
+                console.log('🔄 Tentando novamente em 2 segundos...');
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // Segunda tentativa
+                try {
+                    return await callAnthropicAPIRobust(prompt);
+                } catch (retryError) {
+                    console.error('❌ Segunda tentativa falhou:', retryError);
+                    throw retryError;
+                }
+            }
+            
+            throw error;
+        }
+    }
+
+    function generateFallbackTasks(planGeral, planning) {
+    console.log('🆘 Gerando tarefas de fallback...');
+    
+    const tasks = [];
+    let taskCounter = 0;
+    
+    // Garantir que planning.id existe
+    const planningId = planning.id || Date.now();
+    
+    // Para cada legislação no plano
+    planGeral.legislations.forEach(legislation => {
+        const hours = planning.legislationHours[legislation.law.name] || 1;
+        const tasksNeeded = Math.ceil(hours); // 1 tarefa por hora
+        
+        console.log(`📚 Criando ${tasksNeeded} tarefa(s) para ${legislation.law.name} (${hours}h)`);
+        
+        for (let i = 0; i < tasksNeeded; i++) {
+            // Definir artigos baseado na legislação
+            let startArt, endArt, arts;
+            
+            if (legislation.law.name.includes('CF88')) {
+                // Constituição Federal - artigos mais importantes
+                const cfArts = [
+                    [1, 2, 3, 4], // Princípios fundamentais
+                    [5, 6, 7, 8], // Direitos individuais
+                    [37, 38, 39, 40], // Administração Pública
+                    [70, 71, 72, 73] // Controle externo
+                ];
+                arts = cfArts[i] || [1 + (i * 4), 2 + (i * 4), 3 + (i * 4), 4 + (i * 4)];
+            } else if (legislation.law.name.includes('CTN')) {
+                // Código Tributário Nacional
+                const ctnArts = [
+                    [1, 2, 3], // Sistema Tributário
+                    [16, 17, 18], // Tributos
+                    [96, 97, 98], // Legislação Tributária
+                    [114, 115, 116] // Crédito Tributário
+                ];
+                arts = ctnArts[i] || [1 + (i * 3), 2 + (i * 3), 3 + (i * 3)];
+            } else {
+                // Lei Complementar ou outras
+                startArt = (legislation.lastArtStudy || 0) + (i * 3) + 1;
+                endArt = startArt + 2;
+                arts = Array.from({length: 3}, (_, idx) => startArt + idx);
+            }
+            
+            // Criar relacionamentos fictícios mas plausíveis
+            const artRefs = arts.map(art => ({
+                art: art,
+                ref: arts.filter(a => a !== art).slice(0, 2) // Relacionar com outros artigos da mesma tarefa
+            }));
+            
+            tasks.push({
+                id: `fallback_${planningId}_${taskCounter++}`,
+                type: 'study',
+                legislation: legislation.law.name,
+                description: `Estudo dos artigos ${arts[0]} ao ${arts[arts.length - 1]} - ${legislation.law.name.replace(/ - .+/, '')}`,
+                arts: arts,
+                artRefs: artRefs,
+                estimatedHours: hours <= 1 ? `${Math.round(hours * 60)}min` : '1h',
+                status: 'pending',
+                completedAt: null,
+                createdAt: new Date().toISOString()
+            });
+        }
+    });
+    
+    console.log(`✅ ${tasks.length} tarefas de fallback geradas com sucesso`);
+    return tasks;
+}
+
     // Função para extrair JSON da resposta
     function extractSanitizeAndValidateJSON(text) {
       try {
@@ -870,6 +1080,174 @@ dotenv.config();
           }
     }
 
+    function parseEstimatedTime(estimatedHours) {
+        if (typeof estimatedHours === 'string') {
+            if (estimatedHours.includes('min')) {
+            return parseInt(estimatedHours.replace(/\D/g, ''));
+            } else if (estimatedHours.includes('h')) {
+            const hours = parseFloat(estimatedHours.replace(/[^\d.]/g, ''));
+            return Math.round(hours * 60);
+            }
+        }
+        return 60; // default 1 hora
+    }
+
+    async function indexLegalTasks(planGeral, planning, tasks, stats, es) {
+        try {
+            // Preparar documento para indexação
+
+            const endDate = new Date(planning.startDate)
+            const daysToAdd = planning.cycleType === 'weekly' ? 7 : 15
+            endDate.setDate(endDate.getDate() + daysToAdd - 1)
+
+            const document = {
+                planningId: Date.now(),
+                generalPlanId: planGeral.idU || planGeral.id,
+                targetExam: planGeral.targetExam,
+                targetPosition: planGeral.targetPosition,
+                examBoard: planGeral.examBoard,
+                area: planGeral.area,
+                cycleType: planning.cycleType,
+                planningPeriod: {
+                    startDate: planning.startDate,
+                    endDate: endDate.toISOString().split('T')[0]
+                },
+                weeklyHours: planning.weeklyHours,
+                includeWeekends: planning.includeWeekends,
+                legislationHours: { ...planning.legislationHours }, 
+                totalPlannedTasks: tasks.length,
+                completedTasks: 0,
+                status: 'active',
+                tasks: tasks.map(task => ({
+                    id: task?.id ? task.id : null,
+                    type: task.type,
+                    legislation: task.legislation,
+                    description: task.description,
+                    arts: task.arts,
+                    artRefs: task.artRefs,
+                    estimatedHours: task.estimatedHours,
+                    estimatedMinutes: parseEstimatedTime(task.estimatedHours),
+                    status: task.status,
+                    completedAt: task.completedAt,
+                    createdAt: task.createdAt
+                })),
+                statistics: {
+                    totalTasks: stats.totalTasks,
+                    totalEstimatedHours: Math.round(stats.totalEstimatedHours * 100) / 100,
+                    legislationBreakdown: stats.legislationBreakdown,
+                    completedTasks: 0,
+                    pendingTasks: stats.totalTasks,
+                    progressPercentage: 0.0
+                },
+                createdAt: new Date().toISOString(),
+                createdBy: planGeral.createdUser,
+                updatedAt: new Date().toISOString(),
+                version: 1
+            };
+
+            // Indexar documento
+            const response = await es.index({
+                index: 'legal-tasks-index',
+                body: document,
+                refresh: true
+            });
+
+            console.log('Documento indexado com sucesso:', response.result);
+            return response;
+
+        } catch (error) {
+            console.error('Erro ao indexar no Elasticsearch:', error);
+            throw error;
+        }
+    }
+
+    function parseAnthropicResponse(anthropicResponse) {
+    console.log('🔍 Fazendo parse da resposta da IA...');
+    
+    if (typeof anthropicResponse !== 'string') {
+        throw new Error(`Resposta não é string. Tipo: ${typeof anthropicResponse}`);
+    }
+    
+    // Limpar a resposta
+    let jsonString = anthropicResponse.trim();
+    
+    // Remover markdown code blocks
+    jsonString = jsonString.replace(/^```(?:json)?\s*/gm, '').replace(/\s*```$/gm, '');
+    
+    // Procurar por array JSON na resposta
+    const arrayMatch = jsonString.match(/\[[\s\S]*\]/);
+    if (arrayMatch) {
+        jsonString = arrayMatch[0];
+    }
+    
+    console.log('📝 JSON limpo (primeiros 300 chars):', jsonString.substring(0, 300));
+    
+    try {
+        const tasks = JSON.parse(jsonString);
+        
+        if (!Array.isArray(tasks)) {
+            throw new Error(`Resultado não é array: ${typeof tasks}`);
+        }
+        
+        if (tasks.length === 0) {
+            throw new Error('Array de tarefas vazio');
+        }
+        
+        // Validar e limpar cada tarefa
+        return tasks.map((task, index) => {
+            if (!task.legislation || !task.description) {
+                throw new Error(`Tarefa ${index} inválida: faltam campos obrigatórios`);
+            }
+            
+            return {
+                id: `ai_${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${index}`,
+                type: task.type || 'study',
+                legislation: task.legislation,
+                description: task.description,
+                arts: Array.isArray(task.arts) ? task.arts : [],
+                artRefs: Array.isArray(task.artRefs) ? task.artRefs : [],
+                estimatedHours: task.estimatedHours || '1h',
+                status: 'pending',
+                completedAt: null,
+                createdAt: new Date().toISOString()
+            };
+        });
+        
+    } catch (parseError) {
+        console.error('❌ Erro no parse JSON:', parseError);
+        console.error('JSON que causou erro:', jsonString);
+        throw new Error(`Erro no parse: ${parseError.message}`);
+    }
+    }
+
+    // Função para calcular estatísticas
+    function calculateTaskStats(tasks) {
+        const stats = {
+            totalTasks: tasks.length,
+            totalEstimatedHours: 0,
+            legislationBreakdown: {}
+        };
+        
+        tasks.forEach(task => {
+            // Calcular horas
+            if (task.estimatedHours) {
+                const hours = task.estimatedHours.includes('min') ? 
+                    parseInt(task.estimatedHours.replace(/\D/g, '')) / 60 :
+                    parseFloat(task.estimatedHours.replace(/[^\d.]/g, '')) || 1;
+                stats.totalEstimatedHours += hours;
+            }
+            
+            // Breakdown por legislação
+            if (!stats.legislationBreakdown[task.legislation]) {
+                stats.legislationBreakdown[task.legislation] = 0;
+            }
+            stats.legislationBreakdown[task.legislation]++;
+        });
+        
+        stats.totalEstimatedHours = Math.round(stats.totalEstimatedHours * 100) / 100;
+        return stats;
+    }
+
 
 export default function createForumRouter({ openai, es }) {
     const router = Router();
@@ -1021,7 +1399,7 @@ export default function createForumRouter({ openai, es }) {
         TEXTO A ANALISAR: ${texto}
 
         TAREFAS A EXECUTAR:
-        1. Explique detalhadamente o texto analisado que se refere ao aritgo ${num_art} da norma ${law}. O artigo na integra consta assim ${artigo}.
+        1. Explique detalhadamente o texto analisado que se refere ao artigo ${num_art} da norma ${law}. O artigo na integra consta assim ${artigo}.
         2. Explique de forma estruturada.
         3. Informe a relação dele com outros dispositivos dentro da propria norma (${law}) e com outras normas.)
         4. Explique a relação dele com a jurisprudência do STF o STJ.
@@ -1035,6 +1413,7 @@ export default function createForumRouter({ openai, es }) {
         * Estruture em parágrafos bem organizados
         * Tamanho: 300-500 palavras
         * Formate com marcadores HTML necessárioamente, incluvise com cores, negrito e italico, sublinhado quando quiser detacar algo
+        * Use <div>, <p>, <h3>, <h4>, <strong>, <em>
 
         * Use linguagem que desperte interesse do leitor
 
@@ -1131,6 +1510,7 @@ export default function createForumRouter({ openai, es }) {
             - Palavras com @(instruções)conceito: Execute a instrução específica entre dos parenteses para o conceito marcado
 
           3. **Formatação**: Retorne o texto em HTML bem estruturado com:
+            - Use <div>, <p>, <h3>, <h4>, <strong>, <em>
             - Parágrafos organizados
             - Definições de conceitos destacadas
             - Estrutura clara e legível
@@ -2127,6 +2507,198 @@ export default function createForumRouter({ openai, es }) {
                     debug: error.message
                 });
             }
+        }
+    });
+
+    router.post('/gerar-tarefas', validateApiKey, async (req, res) => {
+        try {
+            const { planGeral, planning } = req.body;
+
+            // Validação básica dos dados recebidos
+            if (!planGeral || !planning || !planGeral.legislations || !planning.legislationHours) {
+                return res.status(400).json({ 
+                    error: 'Dados incompletos: planGeral e planning são obrigatórios' 
+                });
+            }
+
+            console.log('📋 Dados recebidos:', {
+                planGeral: {
+                    area: planGeral.area,
+                    targetExam: planGeral.targetExam,
+                    examBoard: planGeral.examBoard,
+                    legislationsCount: planGeral.legislations.length
+                },
+                planning: {
+                    id: planning.id,
+                    cycleType: planning.cycleType,
+                    weeklyHours: planning.weeklyHours,
+                    legislationHours: planning.legislationHours
+                }
+            });
+
+            const prompt = `
+                Você é um especialista em planejamento de estudos jurídicos para concursos e provas da oab. Analise os dados fornecidos e gere tarefas de estudo otimizadas.
+
+                ## DADOS DO PLANO GERAL:
+                - Área: ${planGeral.area}
+                - Concurso: ${planGeral.targetExam}
+                - Cargo: ${planGeral.targetPosition}  
+                - Banca: ${planGeral.examBoard}
+                - Período: ${planGeral.startDate} a ${planGeral.endDate}
+
+                ## LEGISLAÇÕES PARA ESTUDO:
+                ${planGeral.legislations.map(leg => `
+                - ${leg.law.name}
+                - Modalidade: ${leg.studyOption}
+                - Prioridade: ${leg.prioridade}
+                - Último artigo estudado: ${leg.lastArtStudy || 'Nenhum (iniciar do art. 1)'}
+                - Artigos específicos: ${leg.listArts ? JSON.stringify(leg.listArts) : 'Todos'}
+                - Artigos já estudados: ${leg.artsStudy ? JSON.stringify(leg.artsStudy) : 'Nenhum'}
+                `).join('')}
+
+                ## CONFIGURAÇÃO DO CICLO ATUAL:
+                - Período: ${planning.startDate} a ${planning.endDate}
+                - Tipo de ciclo: ${planning.cycleType}
+                - Horas semanais: ${planning.weeklyHours}
+                - Inclui finais de semana: ${planning.includeWeekends}
+                - Distribuição de horas por legislação: ${JSON.stringify(planning.legislationHours)}
+
+                ## INSTRUÇÕES PARA GERAÇÃO DE TAREFAS:
+
+                ### 1. ESTRUTURA DE CADA TAREFA:
+                \`\`\`json
+                {
+                "id": "timestamp_único",
+                "type": "study", 
+                "legislation": "nome_da_legislação",
+                "description": "Descrição clara da tarefa (ex: 'Estudo dos artigos 1 a 4 da CF88 - Princípios Fundamentais')",
+                "arts": [1, 2, 3, 4],
+                "artRefs": [
+                    {"art": 1, "ref": [5, 6, 37]},
+                    {"art": 2, "ref": [1, 3, 5]},
+                    {"art": 3, "ref": [1, 2, 4]},
+                    {"art": 4, "ref": [2, 3, 6]}
+                ],
+                "estimatedHours": "45min",
+                "status": "pending",
+                "completedAt": null,
+                "createdAt": "2025-08-28T00:00:00.000Z"
+                }
+                \`\`\`
+
+                ### 2. CRITÉRIOS PARA GERAÇÃO:
+
+                **DURAÇÃO DAS TAREFAS:**
+                - Cada tarefa: 30 minutos a 1 hora máximo
+                - Incluir tempo para: leitura + flashcards + questões + mapas mentais
+                - Se legislação tem mais de 1h disponível, criar múltiplas tarefas
+
+                **SELEÇÃO DE ARTIGOS POR MODALIDADE:**
+                - **Integral**: Sequencial desde art. 1 ou desde lastArtStudy
+                - **Indicar**: Apenas artigos em listArts  
+                - **Seletivo**: Artigos mais cobrados em provas dos últimos 5 anos (${planGeral.examBoard} prioritária, principais bancas como alternativa, considerando  Área: ${planGeral.area ? planGeral.area : 'principais'}, Concurso: ${ planGeral.targetExam ? planGeral.targetExam : 'principais'  } e Cargo: ${planGeral.targetPosition ? planGeral.targetPosition : 'principais'}.
+
+                **RELACIONAMENTOS ENTRE ARTIGOS:**
+                - Para cada artigo estudado, identificar artigos relacionados da mesma lei
+                - Base: questões de provas dos últimos 5 anos da banca ${planGeral.examBoard}
+                - Se poucos dados da banca específica, usar FGV, CESPE, FCC, CESGRANRIO
+                - Formato: {"art": X, "ref": [Y, Z]} ou {"art": X, "ref": []} se sem relações
+
+                **DISTRIBUIÇÃO DE TEMPO:**
+                Respeitar rigorosamente planning.legislationHours:
+                ${Object.entries(planning.legislationHours).map(([lei, horas]) => 
+                `- ${lei}: ${horas} hora(s)`
+                ).join('\n')}
+
+                ### 3. REGRAS DE EXCLUSÃO:
+                - Excluir artigos já estudados (artsStudy)
+                - Para modalidade "integral": continuar de lastArtStudy + 1
+                - Para modalidade "indicar": apenas artigos de listArts
+
+                ### 4. CRITÉRIOS DE QUALIDADE:
+                - Agrupar artigos por tema/capítulo quando possível
+                - Priorizar artigos mais cobrados em ${planGeral.targetExam}
+                - Equilibrar quantidade de artigos com tempo disponível
+                - Descrições claras e motivacionais
+
+                ## RETORNO ESPERADO:
+                Retorne APENAS um array JSON válido com as tarefas geradas, sem texto adicional:
+
+                [
+                {
+                    // tarefa 1
+                },
+                {
+                    // tarefa 2  
+                }
+                // ... demais tarefas
+                ]
+
+                IMPORTANTE: 
+                - O JSON deve ser válido e parseável
+                - Respeitar exatamente as horas definidas para cada legislação
+                - Considerar que esta é uma semana de ${planning.weeklyHours} horas totais
+                - Focar na qualidade sobre quantidade de artigos por tarefa
+            `;
+
+            let tasks;
+            let usedFallback = false;
+
+            // const anthropicResponse = await callAnthropicAPI(prompt);
+            
+            try {
+                console.log('🤖 Tentando gerar tarefas com IA...');
+                const anthropicResponse = await callAnthropicAPIRobust(prompt);
+
+                tasks = parseAnthropicResponse(anthropicResponse);
+                console.log('✅ Tarefas geradas com IA:', tasks.length);
+                
+            } catch (parseError) {
+                console.error('❌ Erro na API da Anthropic:', apiError);
+                console.log('🆘 Usando sistema de fallback...');
+                
+                // Usar sistema de fallback
+                tasks = generateFallbackTasks(planGeral, planning);
+                usedFallback = true;
+            }
+
+            // Estatísticas das tarefas geradas
+            const stats = calculateTaskStats(tasks);
+
+            // INDEXAR NO ELASTICSEARCH
+            try {
+                if (typeof indexLegalTasks === 'function') {
+                    await indexLegalTasks(planGeral, planning, tasks, stats, es);
+                }
+            } catch (esError) {
+                console.error('⚠️ Erro na indexação (não fatal):', esError);
+            }
+
+            res.json({
+                success: true,
+                data: {
+                    tasks,
+                    planning: {
+                        id: planning.id,
+                        totalTasks: tasks.length,
+                        period: `${planning.startDate} a ${planning.endDate}`,
+                        weeklyHours: planning.weeklyHours
+                    },
+                    stats,
+                    metadata: {
+                        generatedWithAI: !usedFallback,
+                        fallbackUsed: usedFallback,
+                        timestamp: new Date().toISOString()
+                    }
+                }
+            });
+
+        } catch (error) {
+            console.error('Erro na geração de tarefas:', error);
+            res.status(500).json({ 
+                error: 'Erro interno do servidor', 
+                message: error.message
+            });
         }
     });
 
