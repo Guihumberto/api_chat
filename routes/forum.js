@@ -1153,7 +1153,7 @@ dotenv.config();
             });
 
             console.log('Documento indexado com sucesso:', response.result);
-            return response;
+            return { idU: resp.data.id, ...document };
 
         } catch (error) {
             console.error('Erro ao indexar no Elasticsearch:', error);
@@ -2670,9 +2670,10 @@ export default function createForumRouter({ openai, es }) {
             const stats = calculateTaskStats(tasks);
 
             // INDEXAR NO ELASTICSEARCH
+            let indexar 
             try {
                 if (typeof indexLegalTasks === 'function') {
-                    await indexLegalTasks(planGeral, planning, tasks, stats, es);
+                    indexar = await indexLegalTasks(planGeral, planning, tasks, stats, es);
                 }
             } catch (esError) {
                 console.error('⚠️ Erro na indexação (não fatal):', esError);
