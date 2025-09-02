@@ -485,7 +485,8 @@ async function indexQuestoesElastic(allSplits, id_law, id_art, list_arts, id_ori
         created_by: 'admin',
         banca: 'GERADA POR IA',
         concurso: 'GERADA POR IA',
-        ano: ano
+        ano: ano,
+        status: "active"
       };
   
       await es.index({

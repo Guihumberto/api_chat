@@ -834,7 +834,8 @@ dotenv.config();
                   status: 'ativa',
                   difficulty_level: inferDifficultyFromQuestion(questao.pergunta, questao.justificativa),
                   source_type: 'ai_generated',
-                  version: '1.0'
+                  version: '1.0',
+                  status: "active"
               };
 
               // Preparar para bulk insert
