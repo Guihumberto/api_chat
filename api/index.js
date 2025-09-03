@@ -1191,19 +1191,19 @@ const PORT = process.env.PORT || 3001
 const isDev = process.env.NODE_ENV === 'development'
 const onVercel = process.env.VERCEL === '1' // Vercel define essa var em runtime
 
-const httpsOptions = {
-  key: fs.readFileSync('./certs/localhost+2-key.pem'),
-  cert: fs.readFileSync('./certs/localhost+2.pem'),
-  minVersion: 'TLSv1.2'
-}
+// const httpsOptions = {
+//   key: fs.readFileSync('./certs/localhost+2-key.pem'),
+//   cert: fs.readFileSync('./certs/localhost+2.pem'),
+//   minVersion: 'TLSv1.2'
+// }
 
-if (isDev) {
-  https.createServer(httpsOptions, app).listen(3001, () => {
-    console.log('HTTPS local em https://localhost:3001')
-  })
-} else {
-  app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
-}
+// if (isDev) {
+//   https.createServer(httpsOptions, app).listen(3001, () => {
+//     console.log('HTTPS local em https://localhost:3001')
+//   })
+// } else {
+//   app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+// }
 
 // Para Vercel, exporte o app
 export default app;
