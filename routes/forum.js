@@ -404,20 +404,21 @@ dotenv.config();
       try {
         const documento = {
           id: generateId(),
-          id_law: dados.id_law,
-          art: dados.art,
-          arts: dados.arts,
-          name_law: dados.name_law,
-          createdAt: dados.createdAt,
+          id_law: dados.id_origin_law,
+          id_forum: dados?.id_law || '',
+          art: dados.nro_art,
+          arts: dados?.arts || [],
+          name_law: dados.lei,
+          createdAt: formatDate(),
           timestamp: new Date().toISOString(),
           titulo: analiseData.titulo,
           disciplina: analiseData.disciplina,
-          texto_original: dados.texto,
+          texto_original: dados.textoartigo,
           texto: analiseData.texto,
           palavras_chaves: analiseData.palavras_chaves,
           questoes: analiseData.questoes,
           metadata: {
-            text_length: dados.texto.length,
+            text_length: dados.textoartigo.length,
             model: 'claude-3-5-sonnet-20241022',
             processing_time: Date.now()
           }
@@ -1249,15 +1250,41 @@ dotenv.config();
         return stats;
     }
 
+     async function indexEstruturadoLaw(id, art, mapamental, es) {
+        try {
+ 
+            const document = {
+                id,
+                art,
+                ...mapamental
+            };
+
+            // Indexar documento
+            const response = await es.index({
+                index: 'mind_maps',
+                body: document,
+                refresh: true
+            });
+
+            console.log('Documento indexado com sucesso:', response);
+            return { idLaw: response._id, ...document };
+
+        } catch (error) {
+            console.error('Erro ao indexar no Elasticsearch:', error);
+            throw error;
+        }
+    }
+
 
 export default function createForumRouter({ openai, es }) {
     const router = Router();
 
     // Rota principal para análise jurídica
     router.post('/gerar_post', validateApiKey, async (req, res) => {
+        const { lei, banca = null, disciplina = null, area = null, cargo = null, id_origin_law = null, id_law = null, comments, textoartigo, nro_art } = req.body;
         const startTime = Date.now();
         try {
-            const { texto } = req.body;
+            const texto = textoartigo + comments;
             const dados =  { ...req.body }
 
             // Validação do input
@@ -1318,6 +1345,7 @@ export default function createForumRouter({ openai, es }) {
             res.json({
                 success: true,
                 data: analysisData,
+                typeresposta: 'createpost',
                 elasticsearch: {
                     analise_id: analiseId,
                     indexed: !!(analiseId)
@@ -2191,6 +2219,224 @@ export default function createForumRouter({ openai, es }) {
                 error: 'Erro interno do servidor',
                 message: 'Ocorreu um erro ao processar sua pergunta. Tente novamente.',
                 errorId: `ERR_${Date.now()}`
+            });
+        }
+    });
+
+    router.post('/create-estrutura', validateApiKey, async (req, res) => {
+        const { lei, banca = null, disciplina = null, area = null, cargo = null, id_origin_law = null, id_law = null, comments, textoartigo, nro_art } = req.body;
+
+        // Validações de entrada
+        if (!lei) {
+            return res.status(400).json({ 
+                error: 'Campo obrigatório: nome da lei.' 
+            });
+        }
+
+        if (lei && lei.length > 200) {
+            return res.status(400).json({
+                error: 'Nome da lei muito longo',
+                message: 'O nome da lei deve ter no máximo 200 caracteres'
+            });
+        }
+
+        try {
+            const prompt = `
+                Você é um assistente jurídico especializado em transformar textos legais em mapas mentais estruturados.
+
+                **LEGISLAÇÃO:** ${lei}
+                **BANCA:** ${banca || 'Todas as principais (CESPE/CEBRASPE, FCC, VUNESP, FGV, etc.)'}
+                **DISCIPLINA:** ${disciplina || 'Multidisciplinar'}
+                **ÁREA:** ${area || 'Todas as principais'}
+                **CARGO:** ${cargo || 'Todos os principais'}
+                **Texto do Artigo:** ${textoartigo || ''}
+                **Commentarios do Artigo:** ${comments || ''}
+
+                Instruções para a busca:
+                1. A partir dos dados acima gere um mapa mental exclusivamente no formato JSON, conforme este modelo
+                2. Utilize o Texto do Artigo prioritariamente para gerar o mapa mental
+                3. Use os Comentários do Artigo de forma complementar para enriquecer a estrutura
+                4. Utilize os outros dados de maneira a dar foco
+
+                **IMPORTANTE:** Retorne APENAS o JSON abaixo, sem texto antes ou depois:
+
+                {
+                    "title": "Título Principal",
+                    "subtitle": "Referência (Art. X)",
+                    "type": "root",
+                    "level": 0,
+                    "expanded": true,
+                    "metadata": {
+                        "source": "Lei Complementar X",
+                        "lastUpdate": "2024-01-01"
+                    },
+                    "children": [
+                        {
+                            "id": "concept-1",
+                            "title": "Conceito Principal",
+                            "description": "Descrição do conceito...",
+                            "type": "concept",
+                            "level": 1,
+                            "expanded": false,
+                            "children": [
+                                {
+                                    "id": "definition-1",
+                                    "title": "Definição Específica",
+                                    "subtitle": "§ 1º",
+                                    "description": "Explicação detalhada...",
+                                    "type": "definition",
+                                    "level": 2,
+                                    "expanded": false,
+                                    "children": [
+                                        {
+                                            "id": "item-1",
+                                            "title": "Item Específico",
+                                            "description": "Detalhe do item...",
+                                            "type": "item",
+                                            "level": 3,
+                                            "icon": "mdi-check-circle",
+                                            "color": "green"
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "id": "exclusions",
+                            "title": "Exclusões",
+                            "type": "exclusion",
+                            "level": 1,
+                            "expanded": false,
+                            "children": [
+                                {
+                                    "id": "exclusion-1",
+                                    "title": "Primeira Exclusão",
+                                    "description": "Descrição da exclusão...",
+                                    "type": "item",
+                                    "level": 2,
+                                    "icon": "mdi-minus-circle"
+                                }
+                            ]
+                        }
+                    ]
+                }
+
+                Regras:
+                - Gere um único JSON completo e bem formatado.
+                - Não inclua nenhuma explicação fora do JSON.
+                - Se necessário, divida o conteúdo internamente mas una tudo em um JSON final.
+                - Respeite os níveis hierárquicos e use os tipos conforme o modelo: 'root', 'concept', 'definition', 'item', 'exclusion'.
+                - Todos os campos exigidos devem ser preenchidos.
+                - Use aspas duplas em todas as propriedades JSON.`;
+
+            // Chamada para a API da Anthropic
+            const anthropicResponse = await callAnthropicAPI(prompt);
+
+            if (!anthropicResponse || !anthropicResponse.content || !anthropicResponse.content[0]) {
+                return res.status(500).json({
+                    error: 'Erro na resposta da IA',
+                    message: 'A IA não retornou uma resposta válida'
+                });
+            }
+
+            // Extrair o conteúdo da resposta
+            let content = anthropicResponse.content[0].text;
+
+            if (!content) {
+                return res.status(500).json({
+                    error: 'Conteúdo vazio da IA',
+                    message: 'A IA retornou um conteúdo vazio'
+                });
+            }
+
+            // Processar e limpar o conteúdo JSON (similar ao código OpenAI)
+            // Remove possível texto antes e depois do JSON
+            const firstBrace = content.indexOf('{');
+            const lastBrace = content.lastIndexOf('}');
+            
+            if (firstBrace !== -1 && lastBrace !== -1) {
+                content = content.substring(firstBrace, lastBrace + 1);
+            }
+
+            try {
+                // Primeira tentativa: parse direto
+                const parsed = JSON.parse(content);
+                
+                // Validar se tem a estrutura básica esperada
+                if (!parsed.title || !parsed.type || !Array.isArray(parsed.children)) {
+                    throw new Error('Estrutura JSON inválida');
+                }
+
+                const respel = await indexEstruturadoLaw(id_origin_law, nro_art, parsed, es)
+
+                console.log('respel', respel);
+
+                return res.json({ mapamental: parsed, typeresposta: 'createestrututura' });
+
+            } catch (parseError) {
+                console.warn('Primeira tentativa de parse falhou:');
+                
+                // Segunda tentativa: limpeza e correção do JSON
+                try {
+                    const fixedContent = content
+                        .replace(/(['"])?([a-zA-Z0-9_]+)(['"])?:/g, '"$2":') // Garante aspas nas chaves
+                        .replace(/'/g, '"') // Troca aspas simples por duplas
+                        .replace(/,\s*}/g, '}') // Remove vírgulas desnecessárias antes de }
+                        .replace(/,\s*]/g, ']') // Remove vírgulas desnecessárias antes de ]
+                        .trim();
+
+                    const parsedFixed = JSON.parse(fixedContent);
+                    
+                    // Validar estrutura novamente
+                    if (!parsedFixed.title || !parsedFixed.type || !Array.isArray(parsedFixed.children)) {
+                        throw new Error('Estrutura JSON inválida após correção');
+                    }
+
+                    await indexEstruturadoLaw(id_origin_law, nro_art, parsedFixed, es)
+
+                    return res.json({ mapamental: parsedFixed, typeresposta: 'createestrututura' });
+
+                } catch (secondParseError) {
+                    console.error('Segunda tentativa de parse também falhou:');
+                    console.error('Conteúdo problemático:');
+                    
+                    // Última tentativa: retornar estrutura padrão com erro
+                    return res.status(422).json({
+                        error: 'Erro ao processar JSON da IA',
+                        message: 'Não foi possível converter a resposta da IA em JSON válido',
+                        rawContent: content.substring(0, 500) + '...', // Primeiros 500 chars para debug
+                        mapamental: {
+                            title: lei || 'Erro no processamento',
+                            subtitle: 'Erro de parsing',
+                            type: 'root',
+                            level: 0,
+                            expanded: true,
+                            metadata: {
+                                source: lei,
+                                lastUpdate: new Date().toISOString().split('T')[0],
+                                error: true
+                            },
+                            children: [{
+                                id: 'error-1',
+                                title: 'Erro no processamento',
+                                description: 'Houve um problema ao processar o conteúdo legal. Tente novamente.',
+                                type: 'concept',
+                                level: 1,
+                                expanded: false,
+                                children: []
+                            }]
+                        },
+                        typeresposta: 'createestrututura'
+                    });
+                }
+            }
+
+        } catch (error) {
+            console.error('Erro ao processar análise de artigos:', error);
+            
+            return res.status(500).json({
+                error: 'Erro interno do servidor',
+                message: error.message || 'Erro desconhecido ao processar a requisição'
             });
         }
     });
