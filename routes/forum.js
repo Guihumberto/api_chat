@@ -970,7 +970,7 @@ dotenv.config();
           }
     }
 
-    async function indexMindMapElastic(allSplits, id_law, id_art, list_arts, id_origin_law, disciplina, banca, legislacao, es) {
+    async function indexMindMapElastic(allSplits, id_law, id_art, list_arts, id_origin_law, disciplina, banca, legislacao, created_by, es) {
           try {
               // Validar se há flashcards para indexar
               if (!allSplits || !Array.isArray(allSplits) || allSplits.length === 0) {
@@ -1003,7 +1003,7 @@ dotenv.config();
                   id_group: id_law || null,
                   art: id_art || null,
                   list_arts: list_arts || [],
-                  created_by: 'admin',
+                  created_by: created_by || 'admin',
                   id_disciplina: disciplina?.id_disciplina || null,
                   status: 'ativo',
                   source_type: 'ai_generated',
@@ -2009,7 +2009,7 @@ export default function createForumRouter({ openai, es }) {
     });
 
     router.post('/gerarMindMap', validateApiKey, async (req, res) => {
-        const { pergunta, banca, contexto, artigo, legislacao, disciplina } = req.body;
+        const { pergunta, banca, contexto, artigo, legislacao, disciplina, created_by } = req.body;
         
         // Validações de entrada
         if (!artigo?.numero || !legislacao?.nome || !pergunta || !artigo.texto) {
@@ -2137,8 +2137,6 @@ export default function createForumRouter({ openai, es }) {
                     throw new Error('Resposta deve ser um array');
                 }
                 
-        
-                
                 processedResponse = {
                     resposta: parsedData,
                     suggestions: generateSuggestions(legislacao.nome, artigo.numero, disciplina?.name_disciplina),
@@ -2164,6 +2162,7 @@ export default function createForumRouter({ openai, es }) {
                 disciplina, 
                 banca || null,
                 legislacao,
+                created_by,
                 es
               );
               console.log('mindmpa indexadas');
