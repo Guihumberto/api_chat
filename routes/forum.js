@@ -11,72 +11,74 @@ dotenv.config();
     // Prompt base para análise jurídica
     const BASE_PROMPT = `Você é um especialista em Legislação com ampla experiência em concursos públicos e ensino jurídico. Analise o texto legal fornecido e execute as seguintes tarefas:
 
-    TEXTO A ANALISAR:
-    [TEXTO_PLACEHOLDER]
+        TEXTO A ANALISAR:
+        [TEXTO_PLACEHOLDER]
 
-    TAREFAS A EXECUTAR:
+        TAREFAS A EXECUTAR:
 
-    1. RESPOSTA EM FORMATO JSON
-    Retorne suas análises no seguinte formato JSON:
+        1. RESPOSTA EM FORMATO JSON
+        Retorne suas análises no seguinte formato JSON:
 
-    \`\`\`json
-    {
-      "palavras_chaves": ["palavra1", "palavra2", "palavra3", "..."],
-      "texto": "Texto explicativo detalhado sobre o conteúdo legal, destacando pontos de atenção, implicações práticas e aspectos relevantes para estudantes e profissionais. Escreva como se fosse uma postagem de blog educativa.",
-      "titulo": "Título atrativo e informativo para o conteúdo",
-      "disciplina": "Nome da disciplina jurídica específica",
-      "questoes": [
+        \`\`\`json
         {
-          "enunciado": "Pergunta objetiva baseada no texto legal",
-          "alternativas": {
-            "a": "Alternativa A",
-            "b": "Alternativa B", 
-            "c": "Alternativa C",
-            "d": "Alternativa D",
-            "e": "Alternativa E"
-          },
-          "resposta_correta": "letra_correta",
-          "justificativa": "Explicação detalhada da resposta com base no texto legal"
+        "palavras_chaves": ["palavra1", "palavra2", "palavra3", "..."],
+        "texto": "Texto explicativo detalhado sobre o conteúdo legal, destacando pontos de atenção, implicações práticas e aspectos relevantes para estudantes e profissionais. Escreva como se fosse uma postagem de blog educativa.",
+        "titulo": "Título atrativo e informativo para o conteúdo",
+        "disciplina": "Nome da disciplina jurídica específica",
+        "questoes": [
+            {
+            "enunciado": "Pergunta objetiva baseada no texto legal",
+            "alternativas": {
+                "a": "Alternativa A",
+                "b": "Alternativa B", 
+                "c": "Alternativa C",
+                "d": "Alternativa D",
+                "e": "Alternativa E"
+            },
+            "resposta_correta": "letra_correta",
+            "justificativa": "Explicação detalhada da resposta com base no texto legal"
+            }
+        ]
         }
-      ]
-    }
-    \`\`\`
+        \`\`\`
 
-    DIRETRIZES ESPECÍFICAS:
+        DIRETRIZES ESPECÍFICAS:
 
-    **Para as palavras-chave:**
-    * Extraia 8-12 termos jurídicos mais relevantes
-    * Inclua tanto conceitos gerais quanto específicos do texto
-    * Priorize termos que aparecem com frequência ou têm importância conceitual
+        **Para as palavras-chave:**
+        * Extraia 3-5 termos jurídicos mais relevantes
+        * Inclua tanto conceitos gerais quanto específicos do texto
+        * Priorize termos que aparecem com frequência ou têm importância conceitual
 
-    **Para o texto explicativo:**
-    * Use linguagem acessível mas tecnicamente precisa
-    * Destaque implicações práticas e aplicações reais
-    * Mencione possíveis pegadinhas ou pontos de confusão
-    * Estruture em parágrafos bem organizados
-    * Tamanho: 300-500 palavras
-    * Formate com marcadores HTML quando necessário
+        **Para o texto explicativo:**
+        * Use linguagem acessível mas tecnicamente precisa
+        * Destaque implicações práticas e aplicações reais
+        * Mencione possíveis pegadinhas ou pontos de confusão
+        * Estruture em parágrafos bem organizados
+        * Tamanho: 300-500 palavras
+        * Formate com marcadores HTML quando necessário, usando negrito, cores, italicos e outros para destacar pontos relevantes
+        * dê espaços de dois <br> entre os parágrafos para melhor leitura
 
-    **Para o título:**
-    * Seja específico e atrativo
-    * Inclua a lei/norma de referência quando relevante
-    * Use linguagem que desperte interesse do leitor
+        **Para o título:**
+        * Seja específico e atrativo
+        * Inclua a lei/norma de referência quando relevante
+        * Use linguagem que desperte interesse do leitor
 
-    **Para as questões:**
-    * Crie 2-3 questões no estilo de concursos públicos
-    * Varie os níveis de dificuldade (básico, intermediário, avançado)
-    * Use pegadinhas típicas de provas (mas sem exagerar)
-    * Alternativas plausíveis e bem estruturadas
-    * Justificativas que citem expressamente o texto legal
+        **Para as questões:**
+        * Crie 2-3 questões no estilo de concursos públicos
+        * Varie os níveis de dificuldade (básico, intermediário, avançado)
+        * Use pegadinhas típicas de provas (mas sem exagerar)
+        * Alternativas plausíveis e bem estruturadas
+        * Justificativas que citem expressamente o texto legal
 
-    **Critérios de Qualidade:**
-    * Precisão técnica absoluta
-    * Didática clara e objetiva
-    * Relevância prática para concursos
-    * Formatação JSON válida
-    * Coerência entre todos os elementos gerados
+        **Critérios de Qualidade:**
+        * Precisão técnica absoluta
+        * Didática clara e objetiva
+        * Relevância prática para concursos
+        * Formatação JSON válida
+        * Coerência entre todos os elementos gerados
 
-    Execute todas as tarefas com excelência técnica e didática.`;
+        Execute todas as tarefas com excelência técnica e didática.
+    `;
 
     // Função para fazer chamada à API da Anthropic
     async function callAnthropicAPI(prompt) {
@@ -467,6 +469,7 @@ dotenv.config();
       - Legislação: ${legislacao.nome} (${legislacao.numero || ''})
       - Artigo: ${artigo.numero}
       - Texto do artigo: "${artigo.texto || 'Não fornecido'}"${bancaInfo}
+      - Comentários sobre o Texto do artigo:  ${contexto.comments || 'Não fornecido'}"
 
       PERGUNTA DO USUÁRIO:
       ${pergunta}
@@ -480,6 +483,7 @@ dotenv.config();
       6. Sempre que possível, relacione com o contexto de concursos públicos e OAB
       7. Se mencionar banca específica, adapte o estilo de cobrança dessa banca
       8. Organize a resposta de forma didática com subtítulos quando necessário
+      9. Utilize Comentários sobre o Texto do artigo para complementar
 
       FORMATO ESPERADO:
       - Resposta direta à pergunta
@@ -886,7 +890,7 @@ dotenv.config();
       }
     }
 
-    async function indexFlashcardsElastic(allSplits, id_law, id_art, list_arts, id_origin_law, disciplina, banca, es) {
+    async function indexFlashcardsElastic(allSplits, id_law, id_art, list_arts, id_origin_law, disciplina, banca, legislacao, es) {
           try {
               // Validar se há flashcards para indexar
               if (!allSplits || !Array.isArray(allSplits) || allSplits.length === 0) {
@@ -918,7 +922,7 @@ dotenv.config();
 
               // Criar documento único com array nested
               const doc = {
-                  title: `Artigo ${id_art} - ${disciplina?.name_disciplina || 'Direito'}`,
+                  title: `Artigo ${id_art} - ${disciplina?.name_disciplina || legislacao?.nome || legislacao?.numero || 'Direito'}`,
                   flashcards: validFlashcards, // Array nested com todos os flashcards
                   typeGuide: 'laws_flashcards', // corrigir typo
                   icon: "mdi-card-text-outline",
@@ -966,7 +970,7 @@ dotenv.config();
           }
     }
 
-    async function indexMindMapElastic(allSplits, id_law, id_art, list_arts, id_origin_law, disciplina, banca, es) {
+    async function indexMindMapElastic(allSplits, id_law, id_art, list_arts, id_origin_law, disciplina, banca, legislacao, es) {
           try {
               // Validar se há flashcards para indexar
               if (!allSplits || !Array.isArray(allSplits) || allSplits.length === 0) {
@@ -989,7 +993,7 @@ dotenv.config();
 
               // Criar documento único com array nested
               const doc = {
-                  title: `Artigo ${id_art} - ${disciplina?.name_disciplina || 'Direito'}`,
+                  title: `Artigo ${id_art} - ${disciplina?.name_disciplina || legislacao?.name || legislacao?.numero || 'Direito'}`,
                   children: validMapMind, // Array nested com todos os flashcards
                   typeGuide: 'laws_mapmind', // corrigir typo
                   disciplina: disciplina?.name_disciplina || 'Não especificada',
@@ -1762,6 +1766,7 @@ export default function createForumRouter({ openai, es }) {
                   - Artigo: ${artigo.numero}
                   - Texto: ${artigo.texto}
                   - Contexto adicional: ${banca ? `- Banca: ${banca}` : ''}
+                  - Comentários do Texto: ${contexto?.comments ? `- comentarios: ${contexto?.comments}` : ''}
 
                   INSTRUÇÕES ESPECÍFICAS PARA ${disciplina?.name_disciplina?.toUpperCase() || 'DIREITO'}:
                   1. Crie questões de CERTO/ERRADO baseadas no conteúdo fornecido
@@ -1774,6 +1779,7 @@ export default function createForumRouter({ openai, es }) {
                   8. Evite perguntas óbvias ou muito simples
                   9. Varie a dificuldade das questões
                   10. Contextualize com temas frequentes em concursos de ${disciplina?.name_disciplina || 'direito'}
+                  11. Utilize o Comentários do Texto para enriquer as perguntas, e justificativas
 
                   FORMATO DE SAÍDA:
                   Retorne EXCLUSIVAMENTE um array JSON válido no formato:
@@ -1909,6 +1915,7 @@ export default function createForumRouter({ openai, es }) {
                 legislacao.id, 
                 disciplina?.id_disciplina, 
                 banca || null,  
+                legislacao,
                 es
               );
               console.log('questoes indexadas');
@@ -1926,6 +1933,7 @@ export default function createForumRouter({ openai, es }) {
                   legislacao.id, 
                   disciplina, 
                   banca || null,
+                  legislacao,
                   es
                );
                console.log('flashcards indexados', resp);
@@ -2027,6 +2035,7 @@ export default function createForumRouter({ openai, es }) {
                   - Artigo: ${artigo.numero}
                   - Texto: ${artigo.texto}
                   - Contexto adicional: ${banca ? `- Banca: ${banca}` : ''}
+                  - Comentários do Texto: ${contexto?.comments ? `${contexto?.comments}` : ''}
 
                   INSTRUÇÕES ESPECÍFICAS PARA ${disciplina?.name_disciplina?.toUpperCase() || 'DIREITO'}:
                   1. Foque especificamente em ${disciplina?.name_disciplina || 'direito geral'}
@@ -2038,6 +2047,8 @@ export default function createForumRouter({ openai, es }) {
                   7. Pode haver mais níveis, dependendo da complexidade (children) do texto
                   8. Siga a estrutura da biblioteca vue3-mindmap que ira renderizar no front
                   9. inclua Emoji para serem exibidos quando relacionado com o texto, para facilitar a memorização
+                  10. Se houver Comentários do Texto, utilize para enriquecer quando relacionado como texto
+                  11. Dentro de um campo "name" faça quebras de linha para não ficar muito longo na vizualização do mapa
 
                   EXEMPLO DE FORMATO DE SAÍDA:
                   Retorne EXCLUSIVAMENTE um array JSON válido no formato:
@@ -2152,6 +2163,7 @@ export default function createForumRouter({ openai, es }) {
                 legislacao.id, 
                 disciplina, 
                 banca || null,
+                legislacao,
                 es
               );
               console.log('mindmpa indexadas');
@@ -2250,7 +2262,7 @@ export default function createForumRouter({ openai, es }) {
                 **ÁREA:** ${area || 'Todas as principais'}
                 **CARGO:** ${cargo || 'Todos os principais'}
                 **Texto do Artigo:** ${textoartigo || ''}
-                **Commentarios do Artigo:** ${comments || ''}
+                **Comentários do Artigo:** ${comments || ''}
 
                 Instruções para a busca:
                 1. A partir dos dados acima gere um mapa mental exclusivamente no formato JSON, conforme este modelo
