@@ -1254,7 +1254,7 @@ dotenv.config();
         return stats;
     }
 
-     async function indexEstruturadoLaw(id, art, mapamental, es) {
+    async function indexEstruturadoLaw(id, art, mapamental, es) {
         try {
  
             const document = {

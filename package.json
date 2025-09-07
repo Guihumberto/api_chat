@@ -20,6 +20,8 @@
     "express-rate-limit": "^8.0.1",
     "helmet": "^8.1.0",
     "mercadopago": "^2.8.0",
-    "openai": "^4.0.0"
+    "multer": "^2.0.2",
+    "openai": "^4.0.0",
+    "pdf-parse": "^1.1.1"
   }
 }

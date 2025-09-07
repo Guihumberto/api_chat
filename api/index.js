@@ -88,16 +88,30 @@ app.use((req, res, next) => {
 //importar rotas
 import concusoRoutes from '../routes/concurso.js'
 import forumRoutes from '../routes/forum.js'
+import workSpaceRouter from '../routes/workspace.js'
 import paymentRoutes  from '../routes/payments.js'
 import webhookRoutes  from '../routes/webhooks.js'
 
 
 const es = new ElasticClient({
-    cloud: { id: process.env.ELASTIC_CLOUD_ID },
+    cloud: {
+        id: process.env.ELASTIC_CLOUD_ID
+    },
     auth: {
         username: process.env.ELASTIC_USER,
         password: process.env.ELASTIC_PASSWORD
-    }
+    },
+    requestTimeout: 60000,     // 60 seconds timeout
+    pingTimeout: 3000,         // 3 seconds ping timeout
+    sniffOnStart: false,       // Disable sniffing on startup to avoid local connections
+    sniffOnConnectionFault: false, // Disable sniffing on connection fault
+    maxRetries: 3,             // Maximum number of retries
+    compression: 'gzip',       // Enable compression
+    ssl: {
+        rejectUnauthorized: true
+    },
+    // Ensure we use the cloud endpoint directly
+    nodes: []
 });
 
 const indexName = "document_embeddings";
@@ -131,6 +145,7 @@ app.get("/app", (req, res) => {
 // Rotas
 app.use('/concursos', concusoRoutes({ openai, es }));
 app.use('/forum', forumRoutes({ openai, es }));
+app.use('/workspace', workSpaceRouter({ openai, es }));
 app.use('/paymentml', paymentRoutes({ openai, es }));
 app.use('/mercadopagowh', webhookRoutes({ openai, es }));
 
