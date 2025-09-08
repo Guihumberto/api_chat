@@ -39,10 +39,10 @@ import fs from 'fs';
 export default function workSpaceRouter({ openai, es }) {
   const router = Router();
 
-  // PDF Text Extraction Function - Alternative implementation
+  // PDF Text Extraction Function - Page by page implementation
   async function extractTextFromPDF(buffer) {
     try {
-      console.log('🔍 Iniciando extração de texto do PDF...');
+      console.log('🔍 Iniciando extração de texto do PDF página por página...');
 
       // Use require instead of dynamic import to avoid initialization issues
       let pdfParse;
@@ -77,27 +77,78 @@ export default function workSpaceRouter({ openai, es }) {
 
       // Configure PDF parsing options for better text extraction
       const options = {
-        pagerender: null,
+        pagerender: null, // Use default page rendering
         max: 0,
         version: 'v2.0.550'
       };
 
       const data = await pdfParse(buffer, options);
-      let extractedText = data.text;
+      const numPages = data.numpages;
+      const allText = data.text || '';
 
-      console.log(`📄 Texto bruto extraído: ${extractedText.length} caracteres`);
-      console.log('📄 Preview do texto bruto:', extractedText.substring(0, 500) + '...');
+      console.log(`📄 PDF contém ${numPages} páginas reais`);
+      console.log(`📄 Texto bruto total: ${allText.length} caracteres`);
 
-      // Clean and format the extracted text
-      extractedText = cleanAndFormatPDFText(extractedText);
+      // Extract pages based on actual PDF structure
+      const pages = [];
 
-      console.log(`✅ Texto formatado: ${extractedText.length} caracteres`);
-      console.log('✅ Preview do texto formatado:', extractedText.substring(0, 500) + '...');
+      if (numPages > 1) {
+        // For multi-page PDFs, try to split by page markers or approximate division
+        const cleanedText = cleanAndFormatPDFText(allText);
 
-      // Split into pages if needed for better processing
-      const pages = splitTextIntoPages(extractedText);
+        // Look for common page separation patterns
+        let textParts = cleanedText.split(/\n\s*(?:Página\s+\d+|Page\s+\d+|\f|\n\s*\d+\s*\n)\s*\n/gi);
 
-      console.log(`📑 Documento dividido em ${pages.length} páginas para processamento`);
+        // If we don't find sufficient separators, divide by approximate character count per page
+        if (textParts.length < numPages) {
+          const avgCharsPerPage = Math.max(1000, cleanedText.length / numPages);
+          textParts = [];
+
+          for (let i = 1; i <= numPages; i++) {
+            const start = (i - 1) * avgCharsPerPage;
+            const end = Math.min(i * avgCharsPerPage, cleanedText.length);
+            const pageText = cleanedText.substring(start, end);
+            textParts.push(pageText);
+          }
+        }
+
+        // Create pages from text parts
+        for (let i = 0; i < Math.min(textParts.length, numPages); i++) {
+          const pageText = textParts[i].trim();
+          if (pageText) {
+            pages.push({
+              num_page: i + 1,
+              text: pageText
+            });
+          }
+        }
+      } else {
+        // For single page PDFs
+        pages.push({
+          num_page: 1,
+          text: cleanAndFormatPDFText(allText)
+        });
+      }
+
+      // Ensure we have pages for all actual PDF pages
+      if (pages.length === 0 && numPages > 0) {
+        console.log('⚠️ Nenhuma página processada, criando estrutura básica...');
+        const cleanedText = cleanAndFormatPDFText(data.text || '');
+        const avgCharsPerPage = Math.max(1000, cleanedText.length / numPages);
+
+        for (let i = 1; i <= numPages; i++) {
+          const start = (i - 1) * avgCharsPerPage;
+          const end = i * avgCharsPerPage;
+          const pageText = cleanedText.substring(start, end);
+
+          pages.push({
+            num_page: i,
+            text: pageText.trim() || `Página ${i}`
+          });
+        }
+      }
+
+      console.log(`📑 PDF processado: ${numPages} páginas reais encontradas`);
 
       return pages;
     } catch (error) {
@@ -139,41 +190,6 @@ export default function workSpaceRouter({ openai, es }) {
       // Clean up excessive whitespace again
       .replace(/\n{3,}/g, '\n\n')
       .trim();
-  }
-
-  // Split text into pages for better processing
-  function splitTextIntoPages(text) {
-    const pages = [];
-    const lines = text.split('\n');
-    let currentPage = '';
-    let lineCount = 0;
-    const maxLinesPerPage = 50; // Approximate lines per page
-
-    for (const line of lines) {
-      currentPage += line + '\n';
-      lineCount++;
-
-      if (lineCount >= maxLinesPerPage || line.trim() === '') {
-        if (currentPage.trim()) {
-          pages.push({
-            num_page: pages.length + 1,
-            text: currentPage.trim()
-          });
-        }
-        currentPage = '';
-        lineCount = 0;
-      }
-    }
-
-    // Add remaining content
-    if (currentPage.trim()) {
-      pages.push({
-        num_page: pages.length + 1,
-        text: currentPage.trim()
-      });
-    }
-
-    return pages;
   }
 
   // Configure multer for file uploads
@@ -284,7 +300,7 @@ export default function workSpaceRouter({ openai, es }) {
               pdfGroups.set(doc.parentId, {
                 id: doc.parentId,
                 elasticId: hit._id, // Use the first child's elasticId for ref
-                type: 'pdf',
+                type: doc.type,
                 title: originalTitle,
                 content: doc.content, // Will be replaced with combined
                 extractedContent: [], // Placeholder
@@ -363,6 +379,57 @@ export default function workSpaceRouter({ openai, es }) {
               const now = new Date().toISOString();
               const indexedDocuments = [];
 
+              // Create root PDF document entry
+              const rootDocument = {
+                id: baseDocumentId,
+                elasticId: '', // Will be set after indexing
+                type: 'pdf',
+                title: title,
+                content: null,
+                url: url || null,
+                extractedContent: null, // Will be populated with pages
+                fileData: null, // Don't save file data for single documents
+                createdAt: now,
+                updatedAt: now,
+                userId: userId || 'anonymous',
+                parentId: null, // Root documents should have null parentId
+                pageNumber: null,
+                totalPages: extractedPages.length,
+                metadata: {
+                  ...metadata,
+                  originalFileName: req.file.originalname,
+                  totalPages: extractedPages.length
+                },
+                documentType: 'workspace_document'
+              };
+
+              // Index root document in Elasticsearch
+              const rootIndexResult = await es.index({
+                index: 'workspace_documents',
+                body: rootDocument,
+                refresh: true
+              });
+
+              // Update root document with elastic ID
+              rootDocument.elasticId = rootIndexResult._id;
+              await es.update({
+                index: 'workspace_documents',
+                id: rootIndexResult._id,
+                body: {
+                  doc: { elasticId: rootIndexResult._id }
+                },
+                refresh: true
+              });
+
+              // Add to indexed documents
+              indexedDocuments.push({
+                documentId: baseDocumentId,
+                elasticId: rootIndexResult._id,
+                parentId: rootDocument.parentId,
+                pageNumber: null
+              });
+
+              // Create page documents
               for (let i = 0; i < extractedPages.length; i++) {
                 const page = extractedPages[i];
                 const pageDocumentId = `${baseDocumentId}_${i + 1}`;
@@ -370,16 +437,16 @@ export default function workSpaceRouter({ openai, es }) {
                 const pageDocument = {
                   id: pageDocumentId,
                   elasticId: '', // Will be set after indexing
-                  type: type || 'pdf_page',
+                  type: 'pdf_page',
                   title: `${title} - Página ${page.num_page}`,
                   content: page.text,
                   url: url || null,
-                  extractedContent: null, // Not needed since content is already the extracted text
-                  fileData: null, // Don't save file data, only text
+                  extractedContent: null,
+                  fileData: null,
                   createdAt: now,
                   updatedAt: now,
                   userId: userId || 'anonymous',
-                  parentId: parentId || baseDocumentId,
+                  parentId: baseDocumentId, // Points to root document
                   pageNumber: page.num_page,
                   totalPages: extractedPages.length,
                   metadata: {
@@ -392,33 +459,32 @@ export default function workSpaceRouter({ openai, es }) {
                 };
 
                 // Index page document in Elasticsearch
-                const indexResult = await es.index({
+                const pageIndexResult = await es.index({
                   index: 'workspace_documents',
                   body: pageDocument,
                   refresh: true
                 });
 
                 // Update with elastic ID
-                pageDocument.elasticId = indexResult._id;
-
-                // Update the document with elastic ID
+                pageDocument.elasticId = pageIndexResult._id;
                 await es.update({
                   index: 'workspace_documents',
-                  id: indexResult._id,
+                  id: pageIndexResult._id,
                   body: {
-                    doc: { elasticId: indexResult._id }
+                    doc: { elasticId: pageIndexResult._id }
                   },
                   refresh: true
                 });
 
                 indexedDocuments.push({
                   documentId: pageDocumentId,
-                  elasticId: indexResult._id,
+                  elasticId: pageIndexResult._id,
+                  parentId: pageDocument.parentId,
                   pageNumber: page.num_page
                 });
               }
 
-              console.log(`📄 ${extractedPages.length} páginas indexadas separadamente no Elasticsearch`);
+              console.log(`📄 PDF root + ${extractedPages.length} páginas indexadas no Elasticsearch`);
 
               return res.json({
                 success: true,
@@ -450,12 +516,12 @@ export default function workSpaceRouter({ openai, es }) {
         title: title,
         content: content || null,
         url: url || null,
-        extractedContent: extractedPages || extractedContent || null,
+        extractedContent: extractedPages || extractedContent || [{ num_page: 1, text: content || null }]  || null,
         fileData: null, // Don't save file data for single documents
         createdAt: now,
         updatedAt: now,
         userId: userId || 'anonymous',
-        parentId: parentId || null,
+        parentId: null, // Root documents should have null parentId
         metadata: metadata || {},
         documentType: 'workspace_document'
       };
@@ -546,11 +612,19 @@ export default function workSpaceRouter({ openai, es }) {
       const { id } = req.params;
 
       // Delete document from Elasticsearch
-      await es.delete({
+      const resp = await es.deleteByQuery({
         index: 'workspace_documents',
-        id: id, // This should be the elastic ID
-        refresh: true
+        body: {
+          query: {
+            term: {
+              parentId: id  // Aqui você filtra pelo parentId
+            }
+          }
+        },
+        refresh: true // Garante que a exclusão será visível logo após
       });
+
+      console.log('resp detele', resp);
 
       res.json({
         success: true,
@@ -618,6 +692,264 @@ export default function workSpaceRouter({ openai, es }) {
       res.status(500).json({
         success: false,
         message: 'Erro ao buscar documento',
+        error: error.message
+      });
+    }
+  });
+
+  // Folder management endpoints for workSpaceStore
+
+  // GET /workspace/folders - Load all folders or specific parent children
+  router.get('/folders', async (req, res) => {
+    try {
+      const { userId, parentId } = req.query;
+
+      let query = {
+        index: 'workspace_folders',
+        body: {
+          query: {
+            bool: {
+              must: [
+                { term: { documentType: 'workspace_folder' } }
+              ]
+            }
+          },
+          sort: [
+            { createdAt: { order: 'asc' } }
+          ],
+          size: 1000
+        }
+      };
+
+      // Add user filter if provided
+      if (userId) {
+        query.body.query.bool.must.push({ term: { userId: userId } });
+      }
+
+      const result = await es.search(query);
+
+      const folders = result.hits.hits.map(hit => ({
+        id: hit._source.id,
+        elasticId: hit._id,
+        type: hit._source.type,
+        title: hit._source.title,
+        parentId: hit._source.parentId,
+        children: hit._source.children || [],
+        createdAt: hit._source.createdAt,
+        updatedAt: hit._source.updatedAt,
+        userId: hit._source.userId,
+        metadata: hit._source.metadata,
+        documentType: hit._source.documentType
+      }));
+
+      res.json({
+        success: true,
+        folders: folders,
+        total: result.hits.total.value
+      });
+
+    } catch (error) {
+      console.error('Error loading folders:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erro ao carregar pastas',
+        error: error.message
+      });
+    }
+  });
+
+  // POST /workspace/folders - Save new folder
+  router.post('/folders', async (req, res) => {
+    try {
+      const { type, title, parentId, userId, metadata } = req.body;
+
+      const folderId = Date.now().toString();
+      const now = new Date().toISOString();
+
+      const folder = {
+        id: folderId,
+        elasticId: '', // Will be set after indexing
+        type: type || 'folder',
+        title: title,
+        parentId: parentId || null,
+        children: [],
+        createdAt: now,
+        updatedAt: now,
+        userId: userId || 'anonymous',
+        metadata: metadata || {},
+        documentType: 'workspace_folder'
+      };
+
+      // Index folder in Elasticsearch
+      const indexResult = await es.index({
+        index: 'workspace_folders',
+        body: folder,
+        refresh: true
+      });
+
+      // Update with elastic ID
+      folder.elasticId = indexResult._id;
+
+      // Update the folder with elastic ID
+      await es.update({
+        index: 'workspace_folders',
+        id: indexResult._id,
+        body: {
+          doc: { elasticId: indexResult._id }
+        },
+        refresh: true
+      });
+
+      res.json({
+        success: true,
+        folderId: folderId,
+        elasticId: indexResult._id,
+        message: 'Pasta criada com sucesso'
+      });
+
+    } catch (error) {
+      console.error('Error saving folder:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erro ao criar pasta',
+        error: error.message
+      });
+    }
+  });
+
+  // PUT /workspace/folders/:id - Update folder
+  router.put('/folders/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updateData = req.body;
+
+      // Add updated timestamp
+      updateData.updatedAt = new Date().toISOString();
+
+      // Update folder in Elasticsearch
+      const updateResult = await es.update({
+        index: 'workspace_folders',
+        id: id, // This should be the elastic ID
+        body: {
+          doc: updateData
+        },
+        refresh: true
+      });
+
+      res.json({
+        success: true,
+        message: 'Pasta atualizada com sucesso',
+        updatedFields: Object.keys(updateData)
+      });
+
+    } catch (error) {
+      console.error('Error updating folder:', error);
+
+      if (error.statusCode === 404) {
+        return res.status(404).json({
+          success: false,
+          message: 'Pasta não encontrada'
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        message: 'Erro ao atualizar pasta',
+        error: error.message
+      });
+    }
+  });
+
+  // DELETE /workspace/folders/:id - Delete folder (recursive - deletes subfolders and documents)
+  router.delete('/folders/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // Function to recursively collect all folders to delete
+      const collectFoldersToDelete = async (folderId, foldersToDelete = []) => {
+        // Add current folder
+        foldersToDelete.push(folderId);
+
+        try {
+          // Find all child folders
+          const childrenQuery = {
+            index: 'workspace_folders',
+            body: {
+              query: {
+                term: { parentId: folderId }
+              }
+            }
+          };
+
+          const childrenResult = await es.search(childrenQuery);
+          const childrenFolders = childrenResult.hits.hits.map(hit => hit._id);
+
+          // Recursively process children
+          for (const childId of childrenFolders) {
+            await collectFoldersToDelete(childId, foldersToDelete);
+          }
+        } catch (error) {
+          console.error('Error finding child folders:', error);
+        }
+
+        return foldersToDelete;
+      };
+
+      // Get all folders to delete (recursive)
+      const foldersToDelete = await collectFoldersToDelete(id);
+
+      console.log(`🗂️ Deleting ${foldersToDelete.length} folders:`, foldersToDelete);
+
+      // Delete all folders
+      if (foldersToDelete.length > 0) {
+        await es.deleteByQuery({
+          index: 'workspace_folders',
+          body: {
+            query: {
+              ids: {
+                values: foldersToDelete
+              }
+            }
+          },
+          refresh: true
+        });
+      }
+
+      // Also delete all documents that belong to these folders (including all subfolders)
+      const folderIds = foldersToDelete;
+      await es.deleteByQuery({
+        index: 'workspace_documents',
+        body: {
+          query: {
+            bool: {
+              should: folderIds.map(folderId => ({ term: { parentId: folderId } }))
+            }
+          }
+        },
+        refresh: true
+      });
+
+      console.log(`📄 Deleting documents in ${folderIds.length} folders:`, folderIds);
+
+      res.json({
+        success: true,
+        message: `${foldersToDelete.length} pastas e seus documentos excluídos com sucesso`,
+        deletedFolders: foldersToDelete.length
+      });
+
+    } catch (error) {
+      console.error('Error deleting folder:', error);
+
+      if (error.statusCode === 404) {
+        return res.status(404).json({
+          success: false,
+          message: 'Pasta não encontrada'
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        message: 'Erro ao excluir pasta',
         error: error.message
       });
     }
