@@ -521,7 +521,7 @@ export default function workSpaceRouter({ openai, es }) {
         createdAt: now,
         updatedAt: now,
         userId: userId || 'anonymous',
-        parentId: null, // Root documents should have null parentId
+        parentId: type == 'text' ? documentId : null, // Root documents should have null parentId
         metadata: metadata || {},
         documentType: 'workspace_document'
       };
@@ -954,6 +954,296 @@ export default function workSpaceRouter({ openai, es }) {
       });
     }
   });
+
+  router.get('/verticalize/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await es.get({
+            index: 'workspace_documents',
+            id: id
+        });
+
+        const document = {
+            elasticId: result._id,
+            title: result._source.title,
+            extractedContent: result._source.extractedContent,
+            userId: result._source.userId,
+            parentId: result._source.parentId,
+        };
+
+        console.log('📄 Documento encontrado:', {
+            title: document.title,
+            extractedContentLength: document.extractedContent?.length || 0
+        });
+
+        // Verifica se há conteúdo extraído
+        if (!document.extractedContent || !Array.isArray(document.extractedContent)) {
+            throw new Error('Documento não possui conteúdo extraído válido');
+        }
+
+        const textAnalyse = document.extractedContent
+            .filter(page => page && page.text) // Filtra páginas válidas
+            .map(page => page.text)
+            .join(' ');
+
+        console.log('📝 Texto analisado:', textAnalyse.substring(0, 200) + '...');
+
+        if (!textAnalyse.trim()) {
+            throw new Error('Conteúdo do documento está vazio');
+        }
+
+        const prompt = `
+          Você é um especialista em análise de editais de concursos públicos. Analise o texto do edital fornecido e estruture o conteúdo programático em formato JSON seguindo exatamente a estrutura especificada.
+
+          **TEXTO DO EDITAL:**
+          ${textAnalyse}
+
+          **INSTRUÇÕES DE ANÁLISE:**
+
+          1. **Identificação Inteligente de Disciplinas:** 
+            Procure por diferentes padrões de disciplinas, incluindo:
+            - Títulos em MAIÚSCULAS (ex: DIREITO CONSTITUCIONAL, MATEMÁTICA, PORTUGUÊS)
+            - Títulos com numeração (ex: "1. LÍNGUA PORTUGUESA", "DISCIPLINA 1 - INFORMÁTICA")
+            - Títulos precedidos por palavras-chave (ex: "CONHECIMENTOS DE...", "NOÇÕES DE...")
+            - Áreas de conhecimento (ex: "Conhecimentos Gerais", "Conhecimentos Específicos")
+            - Disciplinas técnicas específicas do cargo
+            - Matérias básicas (Português, Matemática, Raciocínio Lógico, Informática, etc.)
+            - Disciplinas jurídicas (todos os ramos do Direito)
+            - Disciplinas administrativas (Administração Pública, Gestão, etc.)
+            - Disciplinas contábeis (Contabilidade Geral, Pública, Custos, etc.)
+            - Outras áreas específicas mencionadas
+
+          2. **Padrões de Estruturação Reconhecidos:**
+            - Disciplinas podem estar separadas por linhas, numeração ou espaçamento
+            - Cada disciplina pode ter seus tópicos numerados (1., 2., 3., etc.) ou com letras (a), b), c) ou com pont e virgula ou so ponto ou so virgula)
+            - Subtópicos podem usar numeração decimal (1.1, 1.2) ou outros padrões
+            - Conteúdo pode estar em parágrafos corridos ou listado
+
+          3. **Estratégia de Identificação:**
+            - Primeiro, identifique TODAS as possíveis disciplinas mencionadas no texto
+            - Depois, associe o conteúdo que pertence a cada disciplina
+            - Se encontrar conteúdo sem disciplina clara, crie uma disciplina "CONHECIMENTOS GERAIS" ou similar
+            - Não ignore nenhuma área de conhecimento mencionada
+
+          4. **Estruturação Hierárquica:**Para cada disciplina encontrada, organize em:
+            - Tópicos (normalmente numerados como 1., 2., 3., etc.)
+            - Subtópicos (quando existirem subdivisões)
+            - Subsubtópicos (níveis mais profundos)
+            - Itens (menor nível de detalhamento)
+
+          5. **Identificação de Legislação:** Para cada item, identifique se é:
+            - Lei (federal, estadual, complementar)
+            - Decreto
+            - Portaria
+            - Instrução Normativa
+            - Resolução
+            - Súmula
+            - Jurisprudência
+            - Emenda Constitucional
+            - Outros normativos
+
+          6. **Extração de Detalhes Legislativos:**
+            - Tipo da norma
+            - Número
+            - Data (quando disponível)
+            - Âmbito (federal, estadual, municipal)
+          
+            **EXEMPLOS DE DISCIPLINAS QUE PODEM APARECER:**
+            - LÍNGUA PORTUGUESA / PORTUGUÊS
+            - MATEMÁTICA / RACIOCÍNIO LÓGICO-MATEMÁTICO
+            - CONHECIMENTOS GERAIS / ATUALIDADES
+            - INFORMÁTICA / NOÇÕES DE INFORMÁTICA
+            - DIREITO CONSTITUCIONAL
+            - DIREITO ADMINISTRATIVO
+            - DIREITO CIVIL / DIREITO PROCESSUAL CIVIL
+            - DIREITO PENAL / DIREITO PROCESSUAL PENAL
+            - DIREITO TRIBUTÁRIO / DIREITO FINANCEIRO
+            - CONTABILIDADE GERAL / CONTABILIDADE PÚBLICA
+            - ADMINISTRAÇÃO PÚBLICA / ADMINISTRAÇÃO GERAL
+            - ECONOMIA / FINANÇAS PÚBLICAS
+            - ESTATÍSTICA
+            - CONHECIMENTOS ESPECÍFICOS DO CARGO
+            - LEGISLAÇÃO ESPECÍFICA
+            - ÉTICA NO SERVIÇO PÚBLICO
+            - E qualquer outra área mencionada no edital
+
+          **ESTRUTURA JSON REQUERIDA:**
+
+          {
+            "originalDocumentId": "${document.elasticId}",
+            "userId": "${document.userId}",
+            "title": "${document.title}",
+            "disciplines": [
+              {
+                "id": "uuid_gerado",
+                "name": "nome_da_disciplina",
+                "order": numero_ordem,
+                "isCompleted": false,
+                "completedAt": null,
+                "progress": {
+                  "total": total_itens,
+                  "completed": 0,
+                  "percentage": 0
+                },
+                "topics": [
+                  {
+                    "id": "uuid_gerado",
+                    "number": "numero_topico",
+                    "title": "titulo_topico",
+                    "content": "conteudo_completo",
+                    "order": numero_ordem,
+                    "isCompleted": false,
+                    "completedAt": null,
+                    "isLegislation": true/false,
+                    "legislationType": "lei|decreto|portaria|instrucao_normativa|resolucao|sumula|jurisprudencia|emenda_constitucional|null",
+                    "legislationDetails": {
+                      "type": "tipo_norma",
+                      "number": "numero_norma",
+                      "date": "data_norma",
+                      "fullReference": "referencia_completa",
+                      "scope": "federal|estadual|municipal"
+                    },
+                    "difficulty": null,
+                    "estimatedHours": null,
+                    "tags": ["tag1", "tag2"],
+                    "notes": "",
+                    "subtopics": [...]
+                  }
+                ]
+              }
+            ],
+            "metadata": {
+              "createdAt": "timestamp_atual",
+              "updatedAt": "timestamp_atual",
+              "version": "1.0",
+              "totalItems": total_calculado,
+              "completedItems": 0,
+              "overallProgress": 0
+            },
+            "settings": {
+              "autoProgressCalculation": true,
+              "showLegislationIcons": true,
+              "groupByDifficulty": false,
+              "estimatedStudyTime": tempo_estimado_total
+            }
+          }
+
+          **REGRAS IMPORTANTES:**
+
+          2. Mantenha a numeração original dos tópicos quando disponível
+          3. Se um item mencionar legislação específica, marque isLegislation como true
+          5. Preserve o conteúdo original nos campos "content"
+          6. Use arrays vazios quando não houver subtópicos
+          7. Campos opcionais podem ser null se não identificados
+          8. Tags devem incluir palavras-chave relevantes do conteúdo
+
+          **EXEMPLO DE IDENTIFICAÇÃO DE LEGISLAÇÃO:**
+
+          - "Lei federal nº 8.112/1990" → isLegislation: true, type: "lei", scope: "federal"
+          - "Decreto estadual nº 123/2020" → isLegislation: true, type: "decreto", scope: "estadual"
+          - "Súmula nº 473 do STF" → isLegislation: true, type: "sumula"
+          - "Conceitos gerais" → isLegislation: false
+
+          **ATENÇÃO ESPECIAL:**
+          - Se o edital menciona "Conhecimentos Gerais E Específicos", trate como disciplinas separadas
+          - Se há uma seção de "Conhecimentos Básicos", inclua todas as matérias dessa seção
+          - Não assuma que só existem disciplinas jurídicas - editais podem ter matemática, português, informática, etc.
+          - Se encontrar listas de conteúdo sem título claro de disciplina, agrupe em "CONHECIMENTOS COMPLEMENTARES"
+
+          **REGRAS CRÍTICAS:**
+          1. **CAPTURE TODAS AS DISCIPLINAS:** Não limite apenas ao Direito - inclua TODAS as áreas mencionadas
+          2. **SEJA ABRANGENTE:** Se há dúvida se algo é uma disciplina, inclua
+          3. **MANTENHA HIERARQUIA:** Preserve a estrutura original do edital
+          4. **GERE IDs ÚNICOS:** Use timestamps ou UUIDs para cada elemento
+          5. **CALCULE TOTAIS:** Some todos os itens para o campo "total"
+          6. **PRESERVE CONTEÚDO:** Mantenha o texto original nos campos "content"
+          7. **IDENTIFIQUE LEGISLAÇÃO:** Marque corretamente leis, decretos, etc.
+
+
+          Responda APENAS com o JSON estruturado, sem texto adicional.
+        `;
+
+        console.log('🤖 Chamando Anthropic API...');
+        const anthropicResponse = await callAnthropicAPI(prompt);
+        console.log('✅ Resposta da Anthropic recebida');
+
+        // Extrai o texto da resposta da Anthropic (formato correto)
+        let responseText;
+        if (anthropicResponse && anthropicResponse.content && anthropicResponse.content.length > 0) {
+            // Extrai apenas o texto da primeira resposta (conteúdo principal)
+            responseText = anthropicResponse.content[0].text;
+        } else {
+            throw new Error('Formato de resposta da Anthropic inválido');
+        }
+
+        console.log('🔧 Texto da resposta:', responseText.substring(0, 100) + '...');
+
+        // Parse da resposta JSON
+        let structuredData;
+        try {
+            structuredData = JSON.parse(responseText);
+            console.log('✅ JSON parseado com sucesso');
+        } catch (parseError) {
+            console.error('❌ Erro ao parsear JSON da resposta:', parseError.message);
+            console.error('Resposta que falhou:', responseText);
+
+            // Tenta limpar a resposta removendo caracteres não-JSON
+            const cleanedResponse = responseText
+                .replace(/^[^{]*/, '') // Remove tudo antes da primeira {
+                .replace(/[^}]*$/, ''); // Remove tudo depois da última }
+
+            try {
+                structuredData = JSON.parse(cleanedResponse);
+                console.log('✅ JSON parseado após limpeza');
+            } catch (secondParseError) {
+                throw new Error('Erro ao parsear resposta da IA mesmo após limpeza: ' + secondParseError.message);
+            }
+        }
+
+        // Verifica se o JSON tem a estrutura esperada
+        if (!structuredData || !structuredData.disciplines) {
+            throw new Error('Estrutura JSON inválida retornada pela IA');
+        }
+
+        console.log(`📊 Estrutura extraída: ${structuredData.disciplines.length} disciplinas`);
+
+        // Salva no Elasticsearch com índice específico para conteúdo verticalizado
+        console.log('💾 Indexando dados no Elasticsearch...');
+        const indexResponse = await es.index({
+            index: 'edital_verticalizer',
+            body: structuredData
+        });
+
+        console.log('✅ Conteúdo verticalizado indexado com sucesso');
+
+        res.json({
+            success: true,
+            message: 'Conteúdo verticalizado com sucesso',
+            data: {
+                originalDocumentId: document.elasticId,
+                verticalizedId: indexResponse._id, // Corrigido: é indexResponse._id, não indexResponse.body._id
+                disciplinesCount: structuredData.disciplines.length,
+                totalItems: structuredData.metadata ? structuredData.metadata.totalItems : 0
+            }
+        });
+
+    } catch (error) {
+        console.error('Erro na verticalização:', error);
+
+        // Adiciona mais informações de debug no erro
+        let errorMessage = 'Erro ao verticalizar conteúdo';
+        if (error.message) {
+            errorMessage += ': ' + error.message;
+        }
+
+        res.status(500).json({
+            success: false,
+            message: errorMessage,
+            error: error.message,
+            stack: error.stack
+        });
+    }
+});
 
   return router;
 }
